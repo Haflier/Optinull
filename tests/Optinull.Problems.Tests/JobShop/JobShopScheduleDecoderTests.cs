@@ -13,7 +13,7 @@ public class JobShopScheduleDecoderTests
 
         var schedule = decoder.Decode(
             problem,
-            [0, 1, 0, 1]);
+            new JobSequence([0, 1, 0, 1]));
 
         Assert.Equal(4, schedule.Operations.Count);
     }
@@ -27,7 +27,7 @@ public class JobShopScheduleDecoderTests
 
         var schedule = decoder.Decode(
             problem,
-            [0, 1, 0, 1]);
+            new JobSequence([0, 1, 0, 1]));
 
         var operations = schedule.Operations;
 
@@ -65,7 +65,7 @@ public class JobShopScheduleDecoderTests
 
         var schedule = decoder.Decode(
             problem,
-            [0, 1, 0, 1]);
+            new JobSequence([0, 1, 0, 1]));
 
         Assert.Equal(6, schedule.Makespan);
     }
@@ -80,7 +80,7 @@ public class JobShopScheduleDecoderTests
         Assert.Throws<ArgumentException>(
             () => decoder.Decode(
                 problem,
-                [0, 1]));
+                new JobSequence([0, 1])));
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class JobShopScheduleDecoderTests
         Assert.Throws<ArgumentException>(
             () => decoder.Decode(
                 problem,
-                [0, 1, 0, 99]));
+                new JobSequence([0, 1, 0, 99])));
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class JobShopScheduleDecoderTests
         Assert.Throws<ArgumentException>(
             () => decoder.Decode(
                 problem,
-                [0, 0, 0, 1]));
+                new JobSequence([0, 0, 0, 1])));
     }
 
     private static JobShopProblem CreateProblem()

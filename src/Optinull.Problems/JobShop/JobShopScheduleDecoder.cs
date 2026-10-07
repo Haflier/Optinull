@@ -4,7 +4,7 @@ public sealed class JobShopScheduleDecoder
 {
     public JobShopSchedule Decode(
         JobShopProblem problem,
-        IReadOnlyList<int> jobSequence)
+        JobSequence jobSequence)
     {
         ArgumentNullException.ThrowIfNull(problem);
         ArgumentNullException.ThrowIfNull(jobSequence);
@@ -33,7 +33,7 @@ public sealed class JobShopScheduleDecoder
             new List<ScheduledOperation>(
                 jobSequence.Count);
 
-        foreach (var jobId in jobSequence)
+        foreach (var jobId in jobSequence.JobIds)
         {
             var job = problem.Jobs
                 .First(job => job.Id == jobId);
@@ -74,7 +74,7 @@ public sealed class JobShopScheduleDecoder
 
     private static void ValidateSequence(
         JobShopProblem problem,
-        IReadOnlyList<int> jobSequence)
+        JobSequence jobSequence)
     {
         var expectedOperationCount =
             problem.Jobs.Sum(
@@ -96,7 +96,7 @@ public sealed class JobShopScheduleDecoder
                 job => job.Id,
                 _ => 0);
 
-        foreach (var jobId in jobSequence)
+        foreach (var jobId in jobSequence.JobIds)
         {
             if (!jobsById.ContainsKey(jobId))
             {
