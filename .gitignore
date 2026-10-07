@@ -1,0 +1,59 @@
+# Build output
+**/bin/
+**/obj/
+
+# Test results
+**/TestResults/
+**/test-results/
+*.trx
+
+# Coverage
+coverage/
+*.coverage
+*.coveragexml
+
+# IDEs
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# Rider
+.rider/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local configuration
+appsettings.Local.json
+appsettings.Development.local.json
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+# Generated reports / runtime output
+artifacts/
+reports/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
