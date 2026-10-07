@@ -1,6 +1,7 @@
 using Optinull.Domain.Evaluation;
 using Optinull.Domain.Problems;
 using Optinull.Domain.Solutions;
+using Optinull.Optimization.Comparison;
 
 namespace Optinull.Optimization.Solvers;
 
@@ -24,15 +25,15 @@ public sealed class GreedySolver : IOptimizationSolver
                 "Cannot solve a problem without an objective.");
         }
 
+        var comparer = new SolutionComparer(
+            problem.Objective.Type);
+
         var current = CreateInitialSolution(problem);
 
         var currentEvaluation = _evaluator.Evaluate(
             problem,
             current);
 
-        // GreedySolver only accepts feasible candidates.
-        // If the initial solution is infeasible, this simple
-        // greedy strategy cannot guarantee that it can recover.
         if (!currentEvaluation.IsFeasible)
         {
             throw new InvalidOperationException(
@@ -44,7 +45,6 @@ public sealed class GreedySolver : IOptimizationSolver
             var bestCandidate = current;
             var bestEvaluation = currentEvaluation;
 
-            // Try the lower bound.
             var lowerCandidate = CopySolution(current);
 
             lowerCandidate.SetValue(
@@ -55,17 +55,15 @@ public sealed class GreedySolver : IOptimizationSolver
                 problem,
                 lowerCandidate);
 
-            if (IsBetter(
-                    problem,
+            if (lowerEvaluation.IsFeasible &&
+                comparer.IsBetter(
                     lowerEvaluation,
-                    bestEvaluation) &&
-                lowerEvaluation.IsFeasible)
+                    bestEvaluation))
             {
                 bestCandidate = lowerCandidate;
                 bestEvaluation = lowerEvaluation;
             }
 
-            // Try the upper bound.
             var upperCandidate = CopySolution(current);
 
             upperCandidate.SetValue(
@@ -76,11 +74,10 @@ public sealed class GreedySolver : IOptimizationSolver
                 problem,
                 upperCandidate);
 
-            if (IsBetter(
-                    problem,
+            if (upperEvaluation.IsFeasible &&
+                comparer.IsBetter(
                     upperEvaluation,
-                    bestEvaluation) &&
-                upperEvaluation.IsFeasible)
+                    bestEvaluation))
             {
                 bestCandidate = upperCandidate;
                 bestEvaluation = upperEvaluation;
@@ -123,36 +120,5 @@ public sealed class GreedySolver : IOptimizationSolver
         }
 
         return copy;
-    }
-
-    private static bool IsBetter(
-        OptimizationProblem problem,
-        EvaluationResult candidate,
-        EvaluationResult current)
-    {
-        if (!candidate.IsFeasible)
-        {
-            return false;
-        }
-
-        if (!current.IsFeasible)
-        {
-            return true;
-        }
-
-        return problem.Objective!.Type switch
-        {
-            Domain.Objectives.ObjectiveType.Maximize =>
-                candidate.ObjectiveValue >
-                current.ObjectiveValue,
-
-            Domain.Objectives.ObjectiveType.Minimize =>
-                candidate.ObjectiveValue <
-                current.ObjectiveValue,
-
-            _ => throw new InvalidOperationException(
-                $"Unsupported objective type: " +
-                $"{problem.Objective.Type}")
-        };
     }
 }

@@ -1,7 +1,8 @@
-using Optinull.Domain.Evaluation;
 using Optinull.Domain.Problems;
 using Optinull.Domain.Solutions;
+using Optinull.Optimization.Comparison;
 using Optinull.Optimization.Neighborhoods;
+using Optinull.Domain.Evaluation;
 
 namespace Optinull.Optimization.Solvers;
 
@@ -27,6 +28,9 @@ public sealed class HillClimbingSolver : IOptimizationSolver
                 "Cannot solve a problem without an objective.");
         }
 
+        var comparer = new SolutionComparer(
+            problem.Objective.Type);
+
         var current = CreateInitialSolution(problem);
 
         var currentEvaluation = _evaluator.Evaluate(
@@ -45,7 +49,9 @@ public sealed class HillClimbingSolver : IOptimizationSolver
             var bestEvaluation = currentEvaluation;
 
             foreach (var neighbor in
-                     _neighborhoodGenerator.Generate(problem, current))
+                     _neighborhoodGenerator.Generate(
+                         problem,
+                         current))
             {
                 var evaluation = _evaluator.Evaluate(
                     problem,
@@ -54,8 +60,7 @@ public sealed class HillClimbingSolver : IOptimizationSolver
                 if (!evaluation.IsFeasible)
                     continue;
 
-                if (IsBetter(
-                        problem,
+                if (comparer.IsBetter(
                         evaluation,
                         bestEvaluation))
                 {
@@ -64,12 +69,8 @@ public sealed class HillClimbingSolver : IOptimizationSolver
                 }
             }
 
-            // No neighbor improves the current solution.
-            // We have reached a local optimum.
             if (ReferenceEquals(bestNeighbor, current))
-            {
                 break;
-            }
 
             current = bestNeighbor;
             currentEvaluation = bestEvaluation;
@@ -93,32 +94,5 @@ public sealed class HillClimbingSolver : IOptimizationSolver
         }
 
         return solution;
-    }
-
-    private static bool IsBetter(
-        OptimizationProblem problem,
-        EvaluationResult candidate,
-        EvaluationResult current)
-    {
-        if (!candidate.IsFeasible)
-            return false;
-
-        if (!current.IsFeasible)
-            return true;
-
-        return problem.Objective!.Type switch
-        {
-            Domain.Objectives.ObjectiveType.Maximize =>
-                candidate.ObjectiveValue >
-                current.ObjectiveValue,
-
-            Domain.Objectives.ObjectiveType.Minimize =>
-                candidate.ObjectiveValue <
-                current.ObjectiveValue,
-
-            _ => throw new InvalidOperationException(
-                $"Unsupported objective type: " +
-                $"{problem.Objective.Type}")
-        };
     }
 }
