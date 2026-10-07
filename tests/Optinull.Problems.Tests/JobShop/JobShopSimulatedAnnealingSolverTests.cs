@@ -132,7 +132,8 @@ public sealed class JobShopSimulatedAnnealingSolverTests
                             new JobOperation(
                                 machineId: 0,
                                 processingTime: 5)
-                        ])
+                        ]
+                    )
                 ]);
 
         var initialSequence =
@@ -149,6 +150,43 @@ public sealed class JobShopSimulatedAnnealingSolverTests
 
         Assert.Equal(
             5,
+            result.Makespan);
+    }
+
+    [Fact]
+    public void Solve_FindsKnownOptimalMakespan_OnThreeByThreeBenchmark()
+    {
+        var problem =
+            CreateThreeByThreeProblem();
+
+        var initialSequence =
+            new JobSequence(
+            [
+                0, 0, 0,
+                1, 1, 1,
+                2, 2, 2
+            ]);
+
+        var solver =
+            new JobShopSimulatedAnnealingSolver(
+                initialTemperature: 100,
+                coolingRate: 0.95,
+                iterationsPerTemperature: 10,
+                random: new Random(42));
+
+        var result =
+            solver.Solve(
+                problem,
+                initialSequence);
+
+        Console.WriteLine(
+            $"3x3 SA makespan: {result.Makespan}");
+
+        Console.WriteLine(
+            $"3x3 SA sequence: [{string.Join(", ", result.Operations.Select(operation => operation.JobId))}]");
+
+        Assert.Equal(
+            11.0,
             result.Makespan);
     }
 
@@ -178,6 +216,45 @@ public sealed class JobShopSimulatedAnnealingSolverTests
             [
                 job0,
                 job1
+            ]);
+    }
+
+    private static JobShopProblem CreateThreeByThreeProblem()
+    {
+        var job0 =
+            new Job(
+                0,
+                [
+                    new JobOperation(0, 3),
+                    new JobOperation(1, 2),
+                    new JobOperation(2, 2)
+                ]);
+
+        var job1 =
+            new Job(
+                1,
+                [
+                    new JobOperation(0, 2),
+                    new JobOperation(2, 1),
+                    new JobOperation(1, 4)
+                ]);
+
+        var job2 =
+            new Job(
+                2,
+                [
+                    new JobOperation(1, 4),
+                    new JobOperation(2, 3),
+                    new JobOperation(0, 2)
+                ]);
+
+        return new JobShopProblem(
+            machineCount: 3,
+            jobs:
+            [
+                job0,
+                job1,
+                job2
             ]);
     }
 

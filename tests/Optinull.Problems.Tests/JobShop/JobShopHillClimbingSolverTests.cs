@@ -84,35 +84,6 @@ public sealed class JobShopHillClimbingSolverTests
             schedule.Makespan);
     }
 
-    private static JobShopProblem CreateProblem()
-    {
-        var job0 = new Job(
-            0,
-            [
-                new JobOperation(
-                    machineId: 0,
-                    processingTime: 3),
-                new JobOperation(
-                    machineId: 1,
-                    processingTime: 2)
-            ]);
-
-        var job1 = new Job(
-            1,
-            [
-                new JobOperation(
-                    machineId: 1,
-                    processingTime: 2),
-                new JobOperation(
-                    machineId: 0,
-                    processingTime: 3)
-            ]);
-
-        return new JobShopProblem(
-            machineCount: 2,
-            jobs: [job0, job1]);
-    }
-
     [Fact]
     public void Solve_ReturnsLocalOptimum()
     {
@@ -128,9 +99,6 @@ public sealed class JobShopHillClimbingSolverTests
             solver.Solve(
                 problem,
                 initialSequence);
-
-        var decoder =
-            new JobShopScheduleDecoder();
 
         var neighborhoodGenerator =
             new JobShopNeighborhoodGenerator();
@@ -165,5 +133,108 @@ public sealed class JobShopHillClimbingSolverTests
                     evaluation.ObjectiveValue >=
                     finalEvaluation.ObjectiveValue);
             });
+    }
+
+    [Fact]
+    public void Solve_FindsKnownOptimalMakespan_OnThreeByThreeBenchmark()
+    {
+        var problem =
+            CreateThreeByThreeProblem();
+
+        var initialSequence =
+            new JobSequence(
+            [
+                0, 0, 0,
+                1, 1, 1,
+                2, 2, 2
+            ]);
+
+        var solver =
+            new JobShopHillClimbingSolver();
+
+        var schedule =
+            solver.Solve(
+                problem,
+                initialSequence);
+
+        Assert.Equal(
+            11.0,
+            schedule.Makespan);
+    }
+
+    private static JobShopProblem CreateProblem()
+    {
+        var job0 =
+            new Job(
+                0,
+                [
+                    new JobOperation(
+                        machineId: 0,
+                        processingTime: 3),
+
+                    new JobOperation(
+                        machineId: 1,
+                        processingTime: 2)
+                ]);
+
+        var job1 =
+            new Job(
+                1,
+                [
+                    new JobOperation(
+                        machineId: 1,
+                        processingTime: 2),
+
+                    new JobOperation(
+                        machineId: 0,
+                        processingTime: 3)
+                ]);
+
+        return new JobShopProblem(
+            machineCount: 2,
+            jobs:
+            [
+                job0,
+                job1
+            ]);
+    }
+
+    private static JobShopProblem CreateThreeByThreeProblem()
+    {
+        var job0 =
+            new Job(
+                0,
+                [
+                    new JobOperation(0, 3),
+                    new JobOperation(1, 2),
+                    new JobOperation(2, 2)
+                ]);
+
+        var job1 =
+            new Job(
+                1,
+                [
+                    new JobOperation(0, 2),
+                    new JobOperation(2, 1),
+                    new JobOperation(1, 4)
+                ]);
+
+        var job2 =
+            new Job(
+                2,
+                [
+                    new JobOperation(1, 4),
+                    new JobOperation(2, 3),
+                    new JobOperation(0, 2)
+                ]);
+
+        return new JobShopProblem(
+            machineCount: 3,
+            jobs:
+            [
+                job0,
+                job1,
+                job2
+            ]);
     }
 }

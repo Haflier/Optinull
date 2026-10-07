@@ -121,6 +121,34 @@ public sealed class JobShopGeneticAlgorithmSolverTests
     }
 
     [Fact]
+    public void Solve_FindsKnownOptimalMakespan_OnThreeByThreeBenchmark()
+    {
+        var problem =
+            CreateThreeByThreeProblem();
+
+        var solver =
+            new JobShopGeneticAlgorithmSolver(
+                populationSize: 100,
+                generations: 100,
+                eliteCount: 2,
+                mutationRate: 0.1,
+                random: new Random(42));
+
+        var result =
+            solver.Solve(problem);
+
+        Console.WriteLine(
+            $"3x3 GA makespan: {result.Makespan}");
+
+        Console.WriteLine(
+            $"3x3 GA sequence: [{string.Join(", ", result.Operations.Select(operation => operation.JobId))}]");
+
+        Assert.Equal(
+            11.0,
+            result.Makespan);
+    }
+
+    [Fact]
     public void Constructor_RejectsInvalidPopulationSize()
     {
         Assert.Throws<ArgumentOutOfRangeException>(
@@ -183,6 +211,45 @@ public sealed class JobShopGeneticAlgorithmSolverTests
             [
                 job0,
                 job1
+            ]);
+    }
+
+    private static JobShopProblem CreateThreeByThreeProblem()
+    {
+        var job0 =
+            new Job(
+                0,
+                [
+                    new JobOperation(0, 3),
+                    new JobOperation(1, 2),
+                    new JobOperation(2, 2)
+                ]);
+
+        var job1 =
+            new Job(
+                1,
+                [
+                    new JobOperation(0, 2),
+                    new JobOperation(2, 1),
+                    new JobOperation(1, 4)
+                ]);
+
+        var job2 =
+            new Job(
+                2,
+                [
+                    new JobOperation(1, 4),
+                    new JobOperation(2, 3),
+                    new JobOperation(0, 2)
+                ]);
+
+        return new JobShopProblem(
+            machineCount: 3,
+            jobs:
+            [
+                job0,
+                job1,
+                job2
             ]);
     }
 }
