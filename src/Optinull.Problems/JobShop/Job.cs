@@ -20,6 +20,8 @@ public sealed class Job
                 "Job ID cannot be negative.");
         }
 
+        Id = id;
+
         ArgumentNullException.ThrowIfNull(operations);
 
         _operations.AddRange(operations);
