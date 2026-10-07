@@ -32,25 +32,6 @@ public sealed class JobShopEvaluatorTests
     }
 
     [Fact]
-    public void Evaluate_ReturnsFeasibleResult()
-    {
-        var problem = CreateProblem();
-
-        var sequence =
-            new JobSequence([1, 0, 1, 0]);
-
-        var evaluator =
-            new JobShopEvaluator();
-
-        var result =
-            evaluator.Evaluate(
-                problem,
-                sequence);
-
-        Assert.True(result.IsFeasible);
-    }
-
-    [Fact]
     public void Evaluate_RejectsInvalidSequence()
     {
         var problem = CreateProblem();

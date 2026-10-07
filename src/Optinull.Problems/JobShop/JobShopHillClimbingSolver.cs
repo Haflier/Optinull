@@ -6,12 +6,14 @@ public sealed class JobShopHillClimbingSolver
 {
     private readonly JobShopEvaluator _evaluator;
     private readonly JobShopNeighborhoodGenerator _neighborhoodGenerator;
+    private readonly JobShopScheduleDecoder _decoder;
 
     public JobShopHillClimbingSolver()
     {
         _evaluator = new JobShopEvaluator();
         _neighborhoodGenerator =
             new JobShopNeighborhoodGenerator();
+        _decoder = new JobShopScheduleDecoder();
     }
 
     public JobShopSchedule Solve(
@@ -69,9 +71,8 @@ public sealed class JobShopHillClimbingSolver
             currentEvaluation = bestEvaluation;
         }
 
-        return new JobShopScheduleDecoder()
-            .Decode(
-                problem,
-                currentSequence);
+        return _decoder.Decode(
+            problem,
+            currentSequence);
     }
 }

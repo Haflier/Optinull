@@ -118,4 +118,58 @@ public sealed class JobShopHillClimbingSolverTests
             machineCount: 2,
             jobs: [job0, job1]);
     }
+
+    [Fact]
+    public void Solve_ReturnsLocalOptimum()
+    {
+        var problem = CreateProblem();
+
+        var initialSequence =
+            new JobSequence([0, 0, 1, 1]);
+
+        var solver =
+            new JobShopHillClimbingSolver();
+
+        var schedule =
+            solver.Solve(
+                problem,
+                initialSequence);
+
+        var decoder =
+            new JobShopScheduleDecoder();
+
+        var neighborhoodGenerator =
+            new JobShopNeighborhoodGenerator();
+
+        var evaluator =
+            new JobShopEvaluator();
+
+        var finalSequence =
+            new JobSequence(
+                schedule.Operations
+                    .Select(operation => operation.JobId));
+
+        var finalEvaluation =
+            evaluator.Evaluate(
+                problem,
+                finalSequence);
+
+        Assert.Equal(
+            schedule.Makespan,
+            finalEvaluation.ObjectiveValue);
+
+        Assert.All(
+            neighborhoodGenerator.Generate(finalSequence),
+            neighbor =>
+            {
+                var evaluation =
+                    evaluator.Evaluate(
+                        problem,
+                        neighbor);
+
+                Assert.True(
+                    evaluation.ObjectiveValue >=
+                    finalEvaluation.ObjectiveValue);
+            });
+    }
 }
