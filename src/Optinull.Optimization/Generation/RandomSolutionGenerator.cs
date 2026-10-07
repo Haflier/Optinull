@@ -1,6 +1,7 @@
 using Optinull.Domain.Problems;
 using Optinull.Domain.Solutions;
 using Optinull.Domain.Variables;
+using Optinull.Optimization.Randomness;
 
 namespace Optinull.Optimization.Generation;
 
@@ -8,7 +9,7 @@ public sealed class RandomSolutionGenerator : ISolutionGenerator
 {
     public Solution Generate(
         OptimizationProblem problem,
-        Random random)
+        IRandomSource random)
     {
         ArgumentNullException.ThrowIfNull(problem);
         ArgumentNullException.ThrowIfNull(random);
@@ -31,7 +32,7 @@ public sealed class RandomSolutionGenerator : ISolutionGenerator
 
     private static double GenerateValue(
         Variable variable,
-        Random random)
+        IRandomSource random)
     {
         return variable.Type switch
         {

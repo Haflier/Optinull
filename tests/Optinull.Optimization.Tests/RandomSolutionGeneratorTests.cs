@@ -1,5 +1,6 @@
 using Optinull.Domain.Problems;
 using Optinull.Optimization.Generation;
+using Optinull.Optimization.Randomness;
 
 namespace Optinull.Optimization.Tests;
 
@@ -26,7 +27,7 @@ public class RandomSolutionGeneratorTests
 
         var solution = generator.Generate(
             problem,
-            new Random(123));
+            new RandomSource(123));
 
         Assert.Equal(3, solution.Values.Count);
 
@@ -65,11 +66,11 @@ public class RandomSolutionGeneratorTests
 
         var solution1 = generator.Generate(
             problem,
-            new Random(42));
+            new RandomSource(42));
 
         var solution2 = generator.Generate(
             problem,
-            new Random(42));
+            new RandomSource(42));
 
         Assert.Equal(
             solution1.GetValue(x),
