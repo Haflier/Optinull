@@ -58,24 +58,12 @@ public sealed class JobShopHillClimbingSolverTests
     }
 
     [Fact]
-    public void Solve_FindsImprovement_WhenOneExists()
+    public void Solve_FindsKnownOptimalMakespan()
     {
         var problem = CreateProblem();
 
         var initialSequence =
             new JobSequence([0, 0, 1, 1]);
-
-        var evaluator =
-            new JobShopEvaluator();
-
-        var initialEvaluation =
-            evaluator.Evaluate(
-                problem,
-                initialSequence);
-
-        Assert.Equal(
-            10.0,
-            initialEvaluation.ObjectiveValue);
 
         var solver =
             new JobShopHillClimbingSolver();
@@ -85,9 +73,15 @@ public sealed class JobShopHillClimbingSolverTests
                 problem,
                 initialSequence);
 
-        Assert.True(
-            schedule.Makespan <
-            initialEvaluation.ObjectiveValue);
+        // The total workload on machine 0 is:
+        // J0 = 3 + J1 = 3 = 6.
+        //
+        // Therefore no schedule can have a makespan
+        // below 6. The solver reaches that lower bound,
+        // so 6 is the global optimum for this instance.
+        Assert.Equal(
+            6.0,
+            schedule.Makespan);
     }
 
     private static JobShopProblem CreateProblem()
