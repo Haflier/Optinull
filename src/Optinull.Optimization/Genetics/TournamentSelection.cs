@@ -65,6 +65,10 @@ public sealed class TournamentSelection : ISelectionStrategy
             }
         }
 
-        return winner;
+        // The loop executes at least once because tournament size
+        // is validated to be greater than zero in the constructor.
+        return winner
+            ?? throw new InvalidOperationException(
+                "Tournament selection failed to select a winner.");
     }
 }
