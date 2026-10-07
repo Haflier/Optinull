@@ -6,6 +6,7 @@ public sealed class JobShopGeneticAlgorithmSolver
     private readonly JobShopScheduleDecoder _decoder;
     private readonly JobShopSequenceGenerator _sequenceGenerator;
     private readonly JobShopSequenceMutation _mutation;
+    private readonly JobShopSequenceCrossover _crossover;
     private readonly Random _random;
 
     private readonly int _populationSize;
@@ -52,6 +53,7 @@ public sealed class JobShopGeneticAlgorithmSolver
         _decoder = new JobShopScheduleDecoder();
         _sequenceGenerator = new JobShopSequenceGenerator();
         _mutation = new JobShopSequenceMutation();
+        _crossover = new JobShopSequenceCrossover();
         _random = random ?? Random.Shared;
 
         _populationSize = populationSize;
@@ -151,9 +153,10 @@ public sealed class JobShopGeneticAlgorithmSolver
                     ranked);
 
             var child =
-                Crossover(
+                _crossover.Crossover(
                     parent1,
-                    parent2);
+                    parent2,
+                    _random);
 
             if (_random.NextDouble() <
                 _mutationRate)
@@ -195,68 +198,6 @@ public sealed class JobShopGeneticAlgorithmSolver
         }
 
         return winner!.Sequence;
-    }
-
-    private JobSequence Crossover(
-        JobSequence firstParent,
-        JobSequence secondParent)
-    {
-        if (firstParent.Count < 2)
-        {
-            return new JobSequence(
-                firstParent.JobIds);
-        }
-
-        var crossoverPoint =
-            _random.Next(
-                1,
-                firstParent.Count);
-
-        var child =
-            firstParent.JobIds
-                .Take(crossoverPoint)
-                .ToList();
-
-        var requiredCounts =
-            firstParent.JobIds
-                .GroupBy(id => id)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group.Count());
-
-        var childCounts =
-            child
-                .GroupBy(id => id)
-                .ToDictionary(
-                    group => group.Key,
-                    group => group.Count());
-
-        foreach (var jobId in secondParent.JobIds)
-        {
-            childCounts.TryGetValue(
-                jobId,
-                out var currentCount);
-
-            requiredCounts.TryGetValue(
-                jobId,
-                out var requiredCount);
-
-            if (currentCount >= requiredCount)
-            {
-                continue;
-            }
-
-            child.Add(jobId);
-            childCounts[jobId] =
-                currentCount + 1;
-
-            if (child.Count == firstParent.Count)
-            {
-                break;
-            }
-        }
-
-        return new JobSequence(child);
     }
 
     private EvaluatedSequence FindBest(
