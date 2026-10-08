@@ -8,6 +8,18 @@ public sealed class Solution
 
     public IReadOnlyDictionary<Variable, double> Values => _values;
 
+    public Solution Clone()
+    {
+        var clone = new Solution();
+
+        foreach (var pair in _values)
+        {
+            clone._values[pair.Key] = pair.Value;
+        }
+
+        return clone;
+    }
+
     public void SetValue(
         Variable variable,
         double value)
