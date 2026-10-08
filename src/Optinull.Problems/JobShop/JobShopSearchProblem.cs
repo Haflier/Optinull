@@ -5,7 +5,7 @@ using Optinull.Optimization.Search;
 
 namespace Optinull.Problems.JobShop;
 
-/// <summary>Adapts a job shop to ISearchProblem over job-repetition sequences.</summary>
+/// <summary>Adapts a job shop to the generic search solvers over job-repetition sequences.</summary>
 public sealed class JobShopSearchProblem :
     IRecombinableProblem<JobSequence>,
     IConstructiveProblem<JobSequence>
@@ -13,15 +13,21 @@ public sealed class JobShopSearchProblem :
     private readonly JobShopProblem _problem;
     private readonly IJobShopEvaluator _evaluator;
     private readonly JobShopNeighborhoodGenerator _neighborhood = new();
+    private readonly JobShopCrossover _crossover;
+    private readonly JobShopMutation _mutation;
 
     public JobShopSearchProblem(
         JobShopProblem problem,
-        IJobShopEvaluator? evaluator = null)
+        IJobShopEvaluator? evaluator = null,
+        JobShopCrossover crossover = JobShopCrossover.OnePoint,
+        JobShopMutation mutation = JobShopMutation.Swap)
     {
         ArgumentNullException.ThrowIfNull(problem);
 
         _problem = problem;
         _evaluator = evaluator ?? new JobShopEvaluator();
+        _crossover = crossover;
+        _mutation = mutation;
     }
 
     public ObjectiveType ObjectiveType => ObjectiveType.Minimize;
@@ -103,6 +109,42 @@ public sealed class JobShopSearchProblem :
         if (first.Count < 2)
             return first;
 
+        return _crossover switch
+        {
+            JobShopCrossover.OnePoint =>
+                OnePointCrossover(first, second, random),
+
+            JobShopCrossover.PrecedencePreserving =>
+                PoxCrossover(first, second, random),
+
+            _ => throw new InvalidOperationException(
+                $"Unsupported crossover: {_crossover}")
+        };
+    }
+
+    public JobSequence Mutate(JobSequence solution, IRandomSource random)
+    {
+        ArgumentNullException.ThrowIfNull(solution);
+        ArgumentNullException.ThrowIfNull(random);
+
+        return _mutation switch
+        {
+            JobShopMutation.Swap =>
+                RandomNeighbor(solution, random),
+
+            JobShopMutation.Insertion =>
+                InsertionMutation(solution, random),
+
+            _ => throw new InvalidOperationException(
+                $"Unsupported mutation: {_mutation}")
+        };
+    }
+
+    private static JobSequence OnePointCrossover(
+        JobSequence first,
+        JobSequence second,
+        IRandomSource random)
+    {
         // Keep a prefix of the first parent, then fill the rest in the
         // second parent's order, never exceeding each job's operation count.
         var point = random.Next(1, first.Count);
@@ -128,8 +170,79 @@ public sealed class JobShopSearchProblem :
         return new JobSequence(child);
     }
 
-    public JobSequence Mutate(JobSequence solution, IRandomSource random) =>
-        RandomNeighbor(solution, random);
+    private JobSequence PoxCrossover(
+        JobSequence first,
+        JobSequence second,
+        IRandomSource random)
+    {
+        var jobIds = _problem.Jobs.Select(job => job.Id).ToList();
+
+        // Random non-empty, proper subset of jobs that keeps its positions.
+        var kept = jobIds
+            .Where(_ => random.Next(0, 2) == 0)
+            .ToHashSet();
+
+        if (kept.Count == 0)
+            kept.Add(jobIds[random.Next(0, jobIds.Count)]);
+
+        if (kept.Count == jobIds.Count && jobIds.Count > 1)
+            kept.Remove(jobIds[random.Next(0, jobIds.Count)]);
+
+        // Fill the other slots with the remaining jobs in parent B's order.
+        // Both parents contain the same number of entries for every job, so
+        // the filler has exactly one entry per open slot.
+        var filler = second.JobIds
+            .Where(id => !kept.Contains(id))
+            .GetEnumerator();
+
+        var child = new int[first.Count];
+
+        for (var i = 0; i < child.Length; i++)
+        {
+            if (kept.Contains(first.JobIds[i]))
+            {
+                child[i] = first.JobIds[i];
+            }
+            else
+            {
+                filler.MoveNext();
+                child[i] = filler.Current;
+            }
+        }
+
+        return new JobSequence(child);
+    }
+
+    private static JobSequence InsertionMutation(
+        JobSequence solution,
+        IRandomSource random)
+    {
+        var ids = solution.JobIds.ToList();
+
+        if (ids.Count < 2)
+            return solution;
+
+        // Moving an entry across identical neighbors changes nothing,
+        // so retry a few times before giving up.
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            var from = random.Next(0, ids.Count);
+            var to = random.Next(0, ids.Count - 1);
+
+            if (to >= from)
+                to++;
+
+            var moved = ids.ToList();
+            var id = moved[from];
+            moved.RemoveAt(from);
+            moved.Insert(to, id);
+
+            if (!moved.SequenceEqual(ids))
+                return new JobSequence(moved);
+        }
+
+        return solution;
+    }
 
     public JobSequence CreateGreedy(Func<JobSequence, EvaluationResult> evaluate)
     {
