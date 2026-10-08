@@ -3,7 +3,7 @@ using Optinull.Problems.JobShop.Benchmarks;
 
 namespace Optinull.Problems.Tests.JobShop;
 
-public sealed class JobShopFt06KnownOptimalSequenceDiagnosticTests
+public sealed class JobShopFt06KnownOptimalSequenceTests
 {
     [Fact]
     public void KnownOptimalSequence_ProducesMakespan55()

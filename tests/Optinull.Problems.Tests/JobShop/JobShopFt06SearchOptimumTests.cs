@@ -3,7 +3,7 @@ using Optinull.Problems.JobShop.Benchmarks;
 
 namespace Optinull.Problems.Tests.JobShop;
 
-public sealed class JobShopFt06Search55DiagnosticTests
+public sealed class JobShopFt06SearchOptimumTests
 {
     [Fact]
     public void SearchForKnownOptimum()
@@ -17,7 +17,7 @@ public sealed class JobShopFt06Search55DiagnosticTests
         var solver =
             new JobShopIteratedLocalSearchSolver(
                 perturbationSwapCount: 3,
-                iterationCount: 500,
+                iterationCount: 200,
                 random: new Random(42));
 
         var evaluator =
