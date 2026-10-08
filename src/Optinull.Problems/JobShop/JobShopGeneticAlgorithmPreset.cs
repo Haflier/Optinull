@@ -1,41 +1,25 @@
 using Optinull.Optimization.Randomness;
-using Optinull.Optimization.Search;
+using Optinull.Problems.JobShop;
+using Optinull.Problems.JobShop.Benchmarks;
 
-namespace Optinull.Problems.JobShop;
+namespace Optinull.Problems.Tests.JobShop;
 
-/// <summary>
-/// GA configuration tuned on FT06 (30 seeds, 20,000 evaluations): the optimum
-/// of 55 was reached on every seed. The operators and the GA parameters belong
-/// together, so both are created here.
-/// </summary>
-public static class JobShopGeneticAlgorithmPreset
+public sealed class JobShopGeneticAlgorithmPresetTests
 {
-    public const int DefaultMaxEvaluations = 20_000;
-    public const int PopulationSize = 30;
-    public const int EliteCount = 2;
-    public const double MutationRate = 0.2;
-    public const int TournamentSize = 3;
-    public const int LocalSearchTries = 30;
+    [Theory]
+    [InlineData(42)]
+    [InlineData(43)]
+    [InlineData(44)]
+    public void Preset_SolvesFt06ToOptimum_WithinBudget(int seed)
+    {
+        var problem = JobShopGeneticAlgorithmPreset.CreateProblem(
+            JobShopBenchmarkInstances.Ft06());
 
-    public static JobShopSearchProblem CreateProblem(
-        JobShopProblem problem,
-        IJobShopEvaluator? evaluator = null) =>
-        new(
-            problem,
-            evaluator,
-            JobShopCrossover.PrecedencePreserving,
-            JobShopMutation.Insertion);
+        var result = JobShopGeneticAlgorithmPreset
+            .CreateSolver(random: new RandomSource(seed))
+            .Solve(problem);
 
-    public static GeneticAlgorithm<JobSequence> CreateSolver(
-        int maxEvaluations = DefaultMaxEvaluations,
-        IRandomSource? random = null) =>
-        new(
-            populationSize: PopulationSize,
-            generations: 1_000_000,
-            eliteCount: EliteCount,
-            mutationRate: MutationRate,
-            tournamentSize: TournamentSize,
-            localSearchTries: LocalSearchTries,
-            maxEvaluations: maxEvaluations,
-            random: random);
+        Assert.Equal(55, result.Evaluation.ObjectiveValue);
+        Assert.True(result.EvaluationCount <= 20_000);
+    }
 }
