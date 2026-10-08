@@ -10,7 +10,7 @@ using Optinull.Optimization.Randomness;
 namespace Optinull.Optimization.Search;
 
 /// <summary>Adapts the expression-based OptimizationProblem to ISearchProblem.</summary>
-public sealed class OptimizationSearchProblem : ISearchProblem<Solution>
+public sealed class OptimizationSearchProblem : IRecombinableProblem<Solution>
 {
     private const double ContinuousStep = 1.0;
 
@@ -76,6 +76,33 @@ public sealed class OptimizationSearchProblem : ISearchProblem<Solution>
 
         return solution;
     }
+
+    public Solution Crossover(
+        Solution first,
+        Solution second,
+        IRandomSource random)
+    {
+        var variables = _problem.Variables;
+
+        if (variables.Count < 2)
+            return first.Clone();
+
+        // One-point crossover over the variable list.
+        var point = random.Next(1, variables.Count);
+
+        var child = new Solution();
+
+        for (var i = 0; i < variables.Count; i++)
+        {
+            var source = i < point ? first : second;
+            child.SetValue(variables[i], source.GetValue(variables[i]));
+        }
+
+        return child;
+    }
+
+    public Solution Mutate(Solution solution, IRandomSource random) =>
+        RandomNeighbor(solution, random);
 
     private static bool TryStep(
         Variable variable,

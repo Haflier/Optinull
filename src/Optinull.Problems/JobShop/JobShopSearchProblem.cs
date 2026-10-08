@@ -6,7 +6,7 @@ using Optinull.Optimization.Search;
 namespace Optinull.Problems.JobShop;
 
 /// <summary>Adapts a job shop to ISearchProblem over job-repetition sequences.</summary>
-public sealed class JobShopSearchProblem : ISearchProblem<JobSequence>
+public sealed class JobShopSearchProblem : IRecombinableProblem<JobSequence>
 {
     private readonly JobShopProblem _problem;
     private readonly IJobShopEvaluator _evaluator;
@@ -82,4 +82,50 @@ public sealed class JobShopSearchProblem : ISearchProblem<JobSequence>
             return new JobSequence(ids);
         }
     }
+
+    public JobSequence Crossover(
+        JobSequence first,
+        JobSequence second,
+        IRandomSource random)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        ArgumentNullException.ThrowIfNull(random);
+
+        if (first.Count != second.Count)
+        {
+            throw new ArgumentException(
+                "Parents must have the same sequence length.");
+        }
+
+        if (first.Count < 2)
+            return first;
+
+        // Keep a prefix of the first parent, then fill the rest in the
+        // second parent's order, never exceeding each job's operation count.
+        var point = random.Next(1, first.Count);
+
+        var child = first.JobIds.Take(point).ToList();
+
+        var remaining = first.JobIds
+            .GroupBy(id => id)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        foreach (var id in child)
+            remaining[id]--;
+
+        foreach (var id in second.JobIds)
+        {
+            if (remaining[id] > 0)
+            {
+                child.Add(id);
+                remaining[id]--;
+            }
+        }
+
+        return new JobSequence(child);
+    }
+
+    public JobSequence Mutate(JobSequence solution, IRandomSource random) =>
+        RandomNeighbor(solution, random);
 }
