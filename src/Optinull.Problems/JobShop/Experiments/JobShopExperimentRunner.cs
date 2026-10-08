@@ -18,6 +18,8 @@ public sealed class JobShopExperimentRunner
 
         var searchProblem = new JobShopSearchProblem(problem);
 
+        var geneticProblem = JobShopGeneticAlgorithmPreset.CreateProblem(problem);
+
         var initialMakespan =
             searchProblem.Evaluate(initialSequence).ObjectiveValue;
 
@@ -37,7 +39,7 @@ public sealed class JobShopExperimentRunner
                 randomSeed),
 
             RunGeneticAlgorithm(
-                searchProblem,
+                geneticProblem,
                 knownOptimalMakespan,
                 randomSeed),
 
@@ -70,6 +72,8 @@ public sealed class JobShopExperimentRunner
         ValidateKnownOptimalMakespan(knownOptimalMakespan);
 
         var searchProblem = new JobShopSearchProblem(problem);
+
+        var geneticProblem = JobShopGeneticAlgorithmPreset.CreateProblem(problem);
 
         var hillClimbingRuns = new List<JobShopExperimentResult>(runCount);
         var simulatedAnnealingRuns = new List<JobShopExperimentResult>(runCount);
@@ -105,7 +109,7 @@ public sealed class JobShopExperimentRunner
 
             geneticAlgorithmRuns.Add(
                 RunGeneticAlgorithm(
-                    searchProblem,
+                    geneticProblem,
                     knownOptimalMakespan,
                     seed));
 
@@ -184,14 +188,9 @@ public sealed class JobShopExperimentRunner
         double? knownOptimalMakespan,
         int randomSeed)
     {
-        var result =
-            new GeneticAlgorithm<JobSequence>(
-                    populationSize: 50,
-                    generations: 399,
-                    eliteCount: 2,
-                    mutationRate: 0.1,
-                    random: new RandomSource(randomSeed))
-                .Solve(problem);
+        var result = JobShopGeneticAlgorithmPreset
+              .CreateSolver(random: new RandomSource(randomSeed))
+              .Solve(problem);
 
         return CreateResult(
             "Genetic Algorithm",
