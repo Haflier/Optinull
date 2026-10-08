@@ -22,18 +22,31 @@ public sealed class SolutionComparer : ISolutionComparer
         if (!current.IsFeasible)
             return true;
 
+        var candidateScore = PenalizedValue(candidate);
+        var currentScore = PenalizedValue(current);
+
         return _objectiveType switch
         {
-            ObjectiveType.Maximize =>
-                candidate.ObjectiveValue >
-                current.ObjectiveValue,
-
-            ObjectiveType.Minimize =>
-                candidate.ObjectiveValue <
-                current.ObjectiveValue,
+            ObjectiveType.Maximize => candidateScore > currentScore,
+            ObjectiveType.Minimize => candidateScore < currentScore,
 
             _ => throw new InvalidOperationException(
                 $"Unsupported objective type: {_objectiveType}")
         };
     }
+
+    // A penalty always makes a solution worse: it lowers a value that is
+    // maximized and raises one that is minimized.
+    private double PenalizedValue(EvaluationResult evaluation) =>
+        _objectiveType switch
+        {
+            ObjectiveType.Maximize =>
+                evaluation.ObjectiveValue - evaluation.Penalty,
+
+            ObjectiveType.Minimize =>
+                evaluation.ObjectiveValue + evaluation.Penalty,
+
+            _ => throw new InvalidOperationException(
+                $"Unsupported objective type: {_objectiveType}")
+        };
 }

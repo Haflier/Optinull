@@ -85,4 +85,40 @@ public class SolutionComparerTests
         Assert.True(
             comparer.IsBetter(candidate, current));
     }
+
+    [Fact]
+    public void Maximize_Penalty_ReducesValue()
+    {
+        var comparer = new SolutionComparer(ObjectiveType.Maximize);
+
+        var penalized = new EvaluationResult(10, isFeasible: true, penalty: 5);
+        var clean = new EvaluationResult(8, isFeasible: true, penalty: 0);
+
+        Assert.False(comparer.IsBetter(penalized, clean));
+        Assert.True(comparer.IsBetter(clean, penalized));
+    }
+
+    [Fact]
+    public void Minimize_Penalty_IncreasesValue()
+    {
+        var comparer = new SolutionComparer(ObjectiveType.Minimize);
+
+        var penalized = new EvaluationResult(5, isFeasible: true, penalty: 10);
+        var clean = new EvaluationResult(8, isFeasible: true, penalty: 0);
+
+        Assert.False(comparer.IsBetter(penalized, clean));
+        Assert.True(comparer.IsBetter(clean, penalized));
+    }
+
+    [Fact]
+    public void EqualPenalizedValues_AreNotBetterThanEachOther()
+    {
+        var comparer = new SolutionComparer(ObjectiveType.Maximize);
+
+        var a = new EvaluationResult(10, isFeasible: true, penalty: 2);
+        var b = new EvaluationResult(8, isFeasible: true, penalty: 0);
+
+        Assert.False(comparer.IsBetter(a, b));
+        Assert.False(comparer.IsBetter(b, a));
+    }
 }
