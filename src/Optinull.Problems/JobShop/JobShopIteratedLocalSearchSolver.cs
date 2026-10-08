@@ -61,6 +61,23 @@ public sealed class JobShopIteratedLocalSearchSolver
         ArgumentNullException.ThrowIfNull(problem);
         ArgumentNullException.ThrowIfNull(initialSequence);
 
+        var sequence =
+            SolveSequence(
+                problem,
+                initialSequence);
+
+        return _decoder.Decode(
+            problem,
+            sequence);
+    }
+
+    public JobSequence SolveSequence(
+        JobShopProblem problem,
+        JobSequence initialSequence)
+    {
+        ArgumentNullException.ThrowIfNull(problem);
+        ArgumentNullException.ThrowIfNull(initialSequence);
+
         var currentSequence =
             _hillClimbingSolver.SolveSequence(
                 problem,
@@ -110,9 +127,7 @@ public sealed class JobShopIteratedLocalSearchSolver
                 improvedSequence;
         }
 
-        return _decoder.Decode(
-            problem,
-            bestSequence);
+        return bestSequence;
     }
 
     private double Evaluate(
