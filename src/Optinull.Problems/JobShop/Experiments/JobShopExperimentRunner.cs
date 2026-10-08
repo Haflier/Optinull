@@ -1,4 +1,5 @@
-using System.Diagnostics;
+using Optinull.Optimization.Randomness;
+using Optinull.Optimization.Search;
 
 namespace Optinull.Problems.JobShop.Experiments;
 
@@ -13,52 +14,40 @@ public sealed class JobShopExperimentRunner
         ArgumentNullException.ThrowIfNull(problem);
         ArgumentNullException.ThrowIfNull(initialSequence);
 
-        ValidateKnownOptimalMakespan(
-            knownOptimalMakespan);
+        ValidateKnownOptimalMakespan(knownOptimalMakespan);
 
-        var evaluator =
-            new JobShopEvaluator();
+        var searchProblem = new JobShopSearchProblem(problem);
 
         var initialMakespan =
-            evaluator
-                .Evaluate(
-                    problem,
-                    initialSequence)
-                .ObjectiveValue;
+            searchProblem.Evaluate(initialSequence).ObjectiveValue;
 
-        var results =
-            new List<JobShopExperimentResult>();
-
-        results.Add(
+        return
+        [
             RunHillClimbing(
-                problem,
+                searchProblem,
                 initialSequence,
                 initialMakespan,
-                knownOptimalMakespan));
+                knownOptimalMakespan),
 
-        results.Add(
             RunSimulatedAnnealing(
-                problem,
+                searchProblem,
                 initialSequence,
                 initialMakespan,
                 knownOptimalMakespan,
-                randomSeed));
+                randomSeed),
 
-        results.Add(
             RunGeneticAlgorithm(
-                problem,
+                searchProblem,
                 knownOptimalMakespan,
-                randomSeed));
+                randomSeed),
 
-        results.Add(
             RunIteratedLocalSearch(
-                problem,
+                searchProblem,
                 initialSequence,
                 initialMakespan,
                 knownOptimalMakespan,
-                randomSeed));
-
-        return results;
+                randomSeed)
+        ];
     }
 
     public IReadOnlyList<JobShopExperimentSummary> RunMultiple(
@@ -78,65 +67,37 @@ public sealed class JobShopExperimentRunner
                 "Run count must be greater than zero.");
         }
 
-        ValidateKnownOptimalMakespan(
-            knownOptimalMakespan);
+        ValidateKnownOptimalMakespan(knownOptimalMakespan);
 
-        var evaluator =
-            new JobShopEvaluator();
+        var searchProblem = new JobShopSearchProblem(problem);
 
-        var initialMakespan =
-            evaluator
-                .Evaluate(
-                    problem,
-                    initialSequence)
-                .ObjectiveValue;
+        var hillClimbingRuns = new List<JobShopExperimentResult>(runCount);
+        var simulatedAnnealingRuns = new List<JobShopExperimentResult>(runCount);
+        var geneticAlgorithmRuns = new List<JobShopExperimentResult>(runCount);
+        var iteratedLocalSearchRuns = new List<JobShopExperimentResult>(runCount);
 
-        var hillClimbingRuns =
-            new List<JobShopExperimentResult>(
-                runCount);
-
-        var simulatedAnnealingRuns =
-            new List<JobShopExperimentResult>(
-                runCount);
-
-        var geneticAlgorithmRuns =
-            new List<JobShopExperimentResult>(
-                runCount);
-
-        var iteratedLocalSearchRuns =
-            new List<JobShopExperimentResult>(
-                runCount);
-
-        for (var run = 0;
-             run < runCount;
-             run++)
+        for (var run = 0; run < runCount; run++)
         {
-            var seed =
-                startingRandomSeed + run;
+            var seed = startingRandomSeed + run;
 
+            // Every run gets its own random start, shared by the
+            // solvers that need one so the comparison is fair.
             var runInitialSequence =
-                new JobShopSequenceGenerator()
-                    .Generate(
-                        problem,
-                        new Random(seed));
+                searchProblem.CreateRandom(new RandomSource(seed));
 
             var runInitialMakespan =
-                evaluator
-                    .Evaluate(
-                        problem,
-                        runInitialSequence)
-                    .ObjectiveValue;
+                searchProblem.Evaluate(runInitialSequence).ObjectiveValue;
 
             hillClimbingRuns.Add(
                 RunHillClimbing(
-                    problem,
+                    searchProblem,
                     runInitialSequence,
                     runInitialMakespan,
                     knownOptimalMakespan));
 
             simulatedAnnealingRuns.Add(
                 RunSimulatedAnnealing(
-                    problem,
+                    searchProblem,
                     runInitialSequence,
                     runInitialMakespan,
                     knownOptimalMakespan,
@@ -144,13 +105,13 @@ public sealed class JobShopExperimentRunner
 
             geneticAlgorithmRuns.Add(
                 RunGeneticAlgorithm(
-                    problem,
+                    searchProblem,
                     knownOptimalMakespan,
                     seed));
 
             iteratedLocalSearchRuns.Add(
                 RunIteratedLocalSearch(
-                    problem,
+                    searchProblem,
                     runInitialSequence,
                     runInitialMakespan,
                     knownOptimalMakespan,
@@ -182,155 +143,92 @@ public sealed class JobShopExperimentRunner
     }
 
     private static JobShopExperimentResult RunHillClimbing(
-        JobShopProblem problem,
+        JobShopSearchProblem problem,
         JobSequence initialSequence,
         double initialMakespan,
         double? knownOptimalMakespan)
     {
-        var countingEvaluator =
-            new CountingJobShopEvaluator(
-                new JobShopEvaluator());
-
-        var solver =
-            new JobShopHillClimbingSolver(
-                countingEvaluator);
-
-        var stopwatch =
-            Stopwatch.StartNew();
-
-        var schedule =
-            solver.Solve(
-                problem,
-                initialSequence);
-
-        stopwatch.Stop();
+        var result =
+            new HillClimbing<JobSequence>()
+                .Solve(problem, initialSequence);
 
         return CreateResult(
             "Hill Climbing",
-            schedule.Makespan,
-            stopwatch.Elapsed,
-            countingEvaluator.EvaluationCount,
+            result,
             initialMakespan,
             knownOptimalMakespan);
     }
 
     private static JobShopExperimentResult RunSimulatedAnnealing(
-        JobShopProblem problem,
+        JobShopSearchProblem problem,
         JobSequence initialSequence,
         double initialMakespan,
         double? knownOptimalMakespan,
         int randomSeed)
     {
-        var countingEvaluator =
-            new CountingJobShopEvaluator(
-                new JobShopEvaluator());
-
-        var solver =
-            new JobShopSimulatedAnnealingSolver(
-                iterationsPerTemperature: 90,
-                random: new Random(randomSeed),
-                evaluator: countingEvaluator);
-
-        var stopwatch =
-            Stopwatch.StartNew();
-
-        var schedule =
-            solver.Solve(
-                problem,
-                initialSequence);
-
-        stopwatch.Stop();
+        var result =
+            new SimulatedAnnealing<JobSequence>(
+                    iterationsPerTemperature: 90,
+                    random: new RandomSource(randomSeed))
+                .Solve(problem, initialSequence);
 
         return CreateResult(
             "Simulated Annealing",
-            schedule.Makespan,
-            stopwatch.Elapsed,
-            countingEvaluator.EvaluationCount,
+            result,
             initialMakespan,
             knownOptimalMakespan);
     }
 
     private static JobShopExperimentResult RunGeneticAlgorithm(
-        JobShopProblem problem,
+        JobShopSearchProblem problem,
         double? knownOptimalMakespan,
         int randomSeed)
     {
-        var countingEvaluator =
-            new CountingJobShopEvaluator(
-                new JobShopEvaluator());
-
-        var solver =
-            new JobShopGeneticAlgorithmSolver(
-                populationSize: 50,
-                generations: 399,
-                eliteCount: 2,
-                mutationRate: 0.1,
-                random: new Random(randomSeed),
-                evaluator: countingEvaluator);
-
-        var stopwatch =
-            Stopwatch.StartNew();
-
-        var schedule =
-            solver.Solve(
-                problem);
-
-        stopwatch.Stop();
+        var result =
+            new GeneticAlgorithm<JobSequence>(
+                    populationSize: 50,
+                    generations: 399,
+                    eliteCount: 2,
+                    mutationRate: 0.1,
+                    random: new RandomSource(randomSeed))
+                .Solve(problem);
 
         return CreateResult(
             "Genetic Algorithm",
-            schedule.Makespan,
-            stopwatch.Elapsed,
-            countingEvaluator.EvaluationCount,
+            result,
             initialMakespan: null,
             knownOptimalMakespan);
     }
 
     private static JobShopExperimentResult RunIteratedLocalSearch(
-        JobShopProblem problem,
+        JobShopSearchProblem problem,
         JobSequence initialSequence,
         double initialMakespan,
         double? knownOptimalMakespan,
         int randomSeed)
     {
-        var countingEvaluator =
-            new CountingJobShopEvaluator(
-                new JobShopEvaluator());
-
-        var solver =
-            new JobShopIteratedLocalSearchSolver(
-                perturbationSwapCount: 3,
-                iterationCount: 10,
-                random: new Random(randomSeed),
-                evaluator: countingEvaluator);
-
-        var stopwatch =
-            Stopwatch.StartNew();
-
-        var schedule =
-            solver.Solve(
-                problem,
-                initialSequence);
-
-        stopwatch.Stop();
+        var result =
+            new IteratedLocalSearch<JobSequence>(
+                    perturbationSize: 3,
+                    iterationCount: 10,
+                    random: new RandomSource(randomSeed))
+                .Solve(problem, initialSequence);
 
         return CreateResult(
             "Iterated Local Search",
-            schedule.Makespan,
-            stopwatch.Elapsed,
-            countingEvaluator.EvaluationCount,
+            result,
             initialMakespan,
             knownOptimalMakespan);
     }
 
     private static JobShopExperimentResult CreateResult(
         string solverName,
-        double makespan,
-        TimeSpan elapsed,
-        int evaluationCount,
+        SearchResult<JobSequence> result,
         double? initialMakespan,
         double? knownOptimalMakespan)
     {
+        var makespan = result.Evaluation.ObjectiveValue;
+
         double? optimalityGap = null;
 
         if (knownOptimalMakespan.HasValue)
@@ -343,8 +241,8 @@ public sealed class JobShopExperimentRunner
         return new JobShopExperimentResult(
             solverName,
             makespan,
-            elapsed,
-            evaluationCount,
+            result.Elapsed,
+            result.EvaluationCount,
             initialMakespan,
             optimalityGap);
     }

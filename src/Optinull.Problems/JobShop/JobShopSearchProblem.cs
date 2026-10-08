@@ -6,7 +6,9 @@ using Optinull.Optimization.Search;
 namespace Optinull.Problems.JobShop;
 
 /// <summary>Adapts a job shop to ISearchProblem over job-repetition sequences.</summary>
-public sealed class JobShopSearchProblem : IRecombinableProblem<JobSequence>
+public sealed class JobShopSearchProblem :
+    IRecombinableProblem<JobSequence>,
+    IConstructiveProblem<JobSequence>
 {
     private readonly JobShopProblem _problem;
     private readonly IJobShopEvaluator _evaluator;
@@ -128,4 +130,57 @@ public sealed class JobShopSearchProblem : IRecombinableProblem<JobSequence>
 
     public JobSequence Mutate(JobSequence solution, IRandomSource random) =>
         RandomNeighbor(solution, random);
+
+    public JobSequence CreateGreedy(Func<JobSequence, EvaluationResult> evaluate)
+    {
+        // Dispatching rule: repeatedly schedule the operation that can
+        // start earliest; break ties by shortest processing time.
+        var jobs = _problem.Jobs;
+        var nextOperation = new int[jobs.Count];
+        var jobReady = new double[jobs.Count];
+        var machineReady = new double[_problem.MachineCount];
+
+        var remaining = jobs.Sum(job => job.Operations.Count);
+        var sequence = new List<int>(remaining);
+
+        while (remaining > 0)
+        {
+            var chosen = -1;
+            var chosenStart = double.MaxValue;
+            var chosenDuration = double.MaxValue;
+
+            for (var j = 0; j < jobs.Count; j++)
+            {
+                if (nextOperation[j] >= jobs[j].Operations.Count)
+                    continue;
+
+                var operation = jobs[j].Operations[nextOperation[j]];
+
+                var start = Math.Max(
+                    jobReady[j],
+                    machineReady[operation.MachineId]);
+
+                if (start < chosenStart ||
+                    (start == chosenStart &&
+                     operation.ProcessingTime < chosenDuration))
+                {
+                    chosen = j;
+                    chosenStart = start;
+                    chosenDuration = operation.ProcessingTime;
+                }
+            }
+
+            var selected = jobs[chosen].Operations[nextOperation[chosen]];
+            var end = chosenStart + selected.ProcessingTime;
+
+            jobReady[chosen] = end;
+            machineReady[selected.MachineId] = end;
+            nextOperation[chosen]++;
+
+            sequence.Add(jobs[chosen].Id);
+            remaining--;
+        }
+
+        return new JobSequence(sequence);
+    }
 }

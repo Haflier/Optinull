@@ -3,6 +3,7 @@ using Optinull.Domain.Objectives;
 using Optinull.Domain.Problems;
 using Optinull.Domain.Solutions;
 using Optinull.Domain.Variables;
+using Optinull.Optimization.Comparison;
 using Optinull.Optimization.Generation;
 using Optinull.Optimization.Neighborhoods;
 using Optinull.Optimization.Randomness;
@@ -10,7 +11,9 @@ using Optinull.Optimization.Randomness;
 namespace Optinull.Optimization.Search;
 
 /// <summary>Adapts the expression-based OptimizationProblem to ISearchProblem.</summary>
-public sealed class OptimizationSearchProblem : IRecombinableProblem<Solution>
+public sealed class OptimizationSearchProblem :
+    IRecombinableProblem<Solution>,
+    IConstructiveProblem<Solution>
 {
     private const double ContinuousStep = 1.0;
 
@@ -103,6 +106,41 @@ public sealed class OptimizationSearchProblem : IRecombinableProblem<Solution>
 
     public Solution Mutate(Solution solution, IRandomSource random) =>
         RandomNeighbor(solution, random);
+
+    public Solution CreateGreedy(Func<Solution, EvaluationResult> evaluate)
+    {
+        ArgumentNullException.ThrowIfNull(evaluate);
+
+        var comparer = new SolutionComparer(ObjectiveType);
+
+        // Start with every variable at its lower bound, then, one
+        // variable at a time, keep the lower or upper bound if it helps.
+        var current = new Solution();
+
+        foreach (var variable in _problem.Variables)
+            current.SetValue(variable, variable.LowerBound);
+
+        var currentEvaluation = evaluate(current);
+
+        foreach (var variable in _problem.Variables)
+        {
+            foreach (var bound in new[] { variable.LowerBound, variable.UpperBound })
+            {
+                var candidate = current.Clone();
+                candidate.SetValue(variable, bound);
+
+                var evaluation = evaluate(candidate);
+
+                if (comparer.IsBetter(evaluation, currentEvaluation))
+                {
+                    current = candidate;
+                    currentEvaluation = evaluation;
+                }
+            }
+        }
+
+        return current;
+    }
 
     private static bool TryStep(
         Variable variable,
