@@ -29,7 +29,7 @@ public sealed class JobShopExperimentRunnerTests
                 knownOptimalMakespan: 11);
 
         Assert.Equal(
-            3,
+            4,
             results.Count);
 
         Assert.Contains(
@@ -43,6 +43,10 @@ public sealed class JobShopExperimentRunnerTests
         Assert.Contains(
             results,
             result => result.SolverName == "Genetic Algorithm");
+
+        Assert.Contains(
+            results,
+            result => result.SolverName == "Iterated Local Search");
     }
 
     [Fact]
@@ -123,6 +127,68 @@ public sealed class JobShopExperimentRunnerTests
     }
 
     [Fact]
+    public void Run_RecordsEvaluationCountForEverySolver()
+    {
+        var problem =
+            CreateThreeByThreeProblem();
+
+        var initialSequence =
+            new JobSequence(
+            [
+                0, 0, 0,
+                1, 1, 1,
+                2, 2, 2
+            ]);
+
+        var runner =
+            new JobShopExperimentRunner();
+
+        var results =
+            runner.Run(
+                problem,
+                initialSequence,
+                knownOptimalMakespan: 11);
+
+        Assert.All(
+            results,
+            result =>
+                Assert.True(
+                    result.EvaluationCount > 0));
+    }
+
+    [Fact]
+    public void RunMultiple_RecordsAverageEvaluationCount()
+    {
+        var problem =
+            CreateThreeByThreeProblem();
+
+        var initialSequence =
+            new JobSequence(
+            [
+                0, 0, 0,
+                1, 1, 1,
+                2, 2, 2
+            ]);
+
+        var runner =
+            new JobShopExperimentRunner();
+
+        var summaries =
+            runner.RunMultiple(
+                problem,
+                initialSequence,
+                runCount: 5,
+                knownOptimalMakespan: 11,
+                startingRandomSeed: 42);
+
+        Assert.All(
+            summaries,
+            summary =>
+                Assert.True(
+                    summary.AverageEvaluationCount > 0));
+    }
+
+    [Fact]
     public void RunMultiple_ReturnsSummaryForEverySolver()
     {
         var problem =
@@ -132,8 +198,8 @@ public sealed class JobShopExperimentRunnerTests
             new JobSequence(
             [
                 0, 0, 0,
-              1, 1, 1,
-              2, 2, 2
+                1, 1, 1,
+                2, 2, 2
             ]);
 
         var runner =
@@ -148,7 +214,7 @@ public sealed class JobShopExperimentRunnerTests
                 startingRandomSeed: 42);
 
         Assert.Equal(
-            3,
+            4,
             summaries.Count);
 
         Assert.All(

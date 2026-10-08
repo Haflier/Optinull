@@ -2,7 +2,7 @@ using Optinull.Domain.Evaluation;
 
 namespace Optinull.Problems.JobShop;
 
-public sealed class JobShopEvaluator
+public sealed class JobShopEvaluator : IJobShopEvaluator
 {
     private readonly JobShopScheduleDecoder _decoder;
 

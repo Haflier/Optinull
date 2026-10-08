@@ -2,7 +2,7 @@ namespace Optinull.Problems.JobShop;
 
 public sealed class JobShopGeneticAlgorithmSolver
 {
-    private readonly JobShopEvaluator _evaluator;
+    private readonly IJobShopEvaluator _evaluator;
     private readonly JobShopScheduleDecoder _decoder;
     private readonly JobShopSequenceGenerator _sequenceGenerator;
     private readonly JobShopSequenceMutation _mutation;
@@ -19,7 +19,8 @@ public sealed class JobShopGeneticAlgorithmSolver
         int generations = 100,
         int eliteCount = 1,
         double mutationRate = 0.1,
-        Random? random = null)
+        Random? random = null,
+        IJobShopEvaluator? evaluator = null)
     {
         if (populationSize <= 0)
         {
@@ -49,7 +50,7 @@ public sealed class JobShopGeneticAlgorithmSolver
                 "Mutation rate must be between zero and one.");
         }
 
-        _evaluator = new JobShopEvaluator();
+        _evaluator = evaluator ?? new JobShopEvaluator();
         _decoder = new JobShopScheduleDecoder();
         _sequenceGenerator = new JobShopSequenceGenerator();
         _mutation = new JobShopSequenceMutation();
@@ -70,29 +71,31 @@ public sealed class JobShopGeneticAlgorithmSolver
         var population =
             GenerateInitialPopulation(problem);
 
-        var best =
-            FindBest(
+        var rankedPopulation =
+            EvaluateAndRank(
                 problem,
                 population);
+
+        var best =
+            rankedPopulation[0];
 
         for (var generation = 0;
              generation < _generations;
              generation++)
         {
-            population =
+            var nextGeneration =
                 CreateNextGeneration(
-                    problem,
-                    population);
+                    rankedPopulation);
 
-            var generationBest =
-                FindBest(
+            rankedPopulation =
+                EvaluateAndRank(
                     problem,
-                    population);
+                    nextGeneration);
 
-            if (generationBest.Evaluation.ObjectiveValue <
+            if (rankedPopulation[0].Evaluation.ObjectiveValue <
                 best.Evaluation.ObjectiveValue)
             {
-                best = generationBest;
+                best = rankedPopulation[0];
             }
         }
 
@@ -104,8 +107,9 @@ public sealed class JobShopGeneticAlgorithmSolver
     private List<JobSequence> GenerateInitialPopulation(
         JobShopProblem problem)
     {
-        var population = new List<JobSequence>(
-            _populationSize);
+        var population =
+            new List<JobSequence>(
+                _populationSize);
 
         for (var i = 0;
              i < _populationSize;
@@ -121,22 +125,10 @@ public sealed class JobShopGeneticAlgorithmSolver
     }
 
     private List<JobSequence> CreateNextGeneration(
-        JobShopProblem problem,
-        List<JobSequence> population)
+        IReadOnlyList<EvaluatedSequence> rankedPopulation)
     {
-        var ranked =
-            population
-                .Select(sequence => new EvaluatedSequence(
-                    sequence,
-                    _evaluator.Evaluate(
-                        problem,
-                        sequence)))
-                .OrderBy(item =>
-                    item.Evaluation.ObjectiveValue)
-                .ToList();
-
         var nextGeneration =
-            ranked
+            rankedPopulation
                 .Take(_eliteCount)
                 .Select(item => item.Sequence)
                 .ToList();
@@ -146,11 +138,11 @@ public sealed class JobShopGeneticAlgorithmSolver
         {
             var parent1 =
                 TournamentSelect(
-                    ranked);
+                    rankedPopulation);
 
             var parent2 =
                 TournamentSelect(
-                    ranked);
+                    rankedPopulation);
 
             var child =
                 _crossover.Crossover(
@@ -174,7 +166,7 @@ public sealed class JobShopGeneticAlgorithmSolver
     }
 
     private JobSequence TournamentSelect(
-        List<EvaluatedSequence> population)
+        IReadOnlyList<EvaluatedSequence> population)
     {
         const int tournamentSize = 3;
 
@@ -200,7 +192,7 @@ public sealed class JobShopGeneticAlgorithmSolver
         return winner!.Sequence;
     }
 
-    private EvaluatedSequence FindBest(
+    private List<EvaluatedSequence> EvaluateAndRank(
         JobShopProblem problem,
         IEnumerable<JobSequence> population)
     {
@@ -212,7 +204,7 @@ public sealed class JobShopGeneticAlgorithmSolver
                     sequence)))
             .OrderBy(item =>
                 item.Evaluation.ObjectiveValue)
-            .First();
+            .ToList();
     }
 
     private sealed record EvaluatedSequence(

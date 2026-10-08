@@ -2,7 +2,7 @@ namespace Optinull.Problems.JobShop;
 
 public sealed class JobShopSimulatedAnnealingSolver
 {
-    private readonly JobShopEvaluator _evaluator;
+    private readonly IJobShopEvaluator _evaluator;
     private readonly JobShopScheduleDecoder _decoder;
     private readonly Random _random;
 
@@ -14,7 +14,8 @@ public sealed class JobShopSimulatedAnnealingSolver
         double initialTemperature = 100.0,
         double coolingRate = 0.95,
         int iterationsPerTemperature = 10,
-        Random? random = null)
+        Random? random = null,
+        IJobShopEvaluator? evaluator = null)
     {
         if (initialTemperature <= 0)
         {
@@ -37,7 +38,7 @@ public sealed class JobShopSimulatedAnnealingSolver
                 "Iterations per temperature must be greater than zero.");
         }
 
-        _evaluator = new JobShopEvaluator();
+        _evaluator = evaluator ?? new JobShopEvaluator();
         _decoder = new JobShopScheduleDecoder();
         _random = random ?? Random.Shared;
 

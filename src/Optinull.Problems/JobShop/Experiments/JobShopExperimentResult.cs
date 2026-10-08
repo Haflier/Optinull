@@ -8,6 +8,8 @@ public sealed class JobShopExperimentResult
 
     public TimeSpan Elapsed { get; }
 
+    public int EvaluationCount { get; }
+
     public double? InitialMakespan { get; }
 
     public double? OptimalityGap { get; }
@@ -16,6 +18,7 @@ public sealed class JobShopExperimentResult
         string solverName,
         double makespan,
         TimeSpan elapsed,
+        int evaluationCount,
         double? initialMakespan = null,
         double? optimalityGap = null)
     {
@@ -40,6 +43,13 @@ public sealed class JobShopExperimentResult
                 "Elapsed time cannot be negative.");
         }
 
+        if (evaluationCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(evaluationCount),
+                "Evaluation count cannot be negative.");
+        }
+
         if (initialMakespan is < 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -57,6 +67,7 @@ public sealed class JobShopExperimentResult
         SolverName = solverName;
         Makespan = makespan;
         Elapsed = elapsed;
+        EvaluationCount = evaluationCount;
         InitialMakespan = initialMakespan;
         OptimalityGap = optimalityGap;
     }

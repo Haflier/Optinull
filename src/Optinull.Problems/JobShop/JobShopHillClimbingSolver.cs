@@ -4,19 +4,36 @@ namespace Optinull.Problems.JobShop;
 
 public sealed class JobShopHillClimbingSolver
 {
-    private readonly JobShopEvaluator _evaluator;
+    private readonly IJobShopEvaluator _evaluator;
     private readonly JobShopNeighborhoodGenerator _neighborhoodGenerator;
     private readonly JobShopScheduleDecoder _decoder;
 
-    public JobShopHillClimbingSolver()
+    public JobShopHillClimbingSolver(
+        IJobShopEvaluator? evaluator = null)
     {
-        _evaluator = new JobShopEvaluator();
-        _neighborhoodGenerator =
-            new JobShopNeighborhoodGenerator();
+        _evaluator = evaluator ?? new JobShopEvaluator();
+        _neighborhoodGenerator = new JobShopNeighborhoodGenerator();
         _decoder = new JobShopScheduleDecoder();
     }
 
     public JobShopSchedule Solve(
+        JobShopProblem problem,
+        JobSequence initialSequence)
+    {
+        ArgumentNullException.ThrowIfNull(problem);
+        ArgumentNullException.ThrowIfNull(initialSequence);
+
+        var sequence =
+            SolveSequence(
+                problem,
+                initialSequence);
+
+        return _decoder.Decode(
+            problem,
+            sequence);
+    }
+
+    public JobSequence SolveSequence(
         JobShopProblem problem,
         JobSequence initialSequence)
     {
@@ -53,26 +70,18 @@ public sealed class JobShopHillClimbingSolver
                 }
             }
 
-            // No neighbors means we are already at a local optimum.
             if (bestNeighbor is null ||
                 bestEvaluation is null)
-            {
                 break;
-            }
 
-            // Hill Climbing only accepts an actual improvement.
             if (bestEvaluation.ObjectiveValue >=
                 currentEvaluation.ObjectiveValue)
-            {
                 break;
-            }
 
             currentSequence = bestNeighbor;
             currentEvaluation = bestEvaluation;
         }
 
-        return _decoder.Decode(
-            problem,
-            currentSequence);
+        return currentSequence;
     }
 }

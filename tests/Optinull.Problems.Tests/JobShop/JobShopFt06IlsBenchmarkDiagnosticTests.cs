@@ -4,10 +4,10 @@ using Optinull.Problems.JobShop.Experiments;
 
 namespace Optinull.Problems.Tests.JobShop;
 
-public sealed class JobShopFt06BenchmarkTests
+public sealed class JobShopFt06IlsBenchmarkDiagnosticTests
 {
-    [Fact(Skip = "Manual benchmark experiment; run explicitly when benchmarking FT06.")]
-    public void RunMultiple_Ft06Benchmark()
+    [Fact]
+    public void RunMultiple_Ft06BenchmarkWithIls()
     {
         var problem =
             JobShopBenchmarkInstances.Ft06();
@@ -30,7 +30,7 @@ public sealed class JobShopFt06BenchmarkTests
             runner.RunMultiple(
                 problem,
                 initialSequence,
-                runCount: 30,
+                runCount: 5,
                 knownOptimalMakespan: 55,
                 startingRandomSeed: 42);
 
@@ -65,8 +65,13 @@ public sealed class JobShopFt06BenchmarkTests
             summary =>
             {
                 Assert.True(summary.BestMakespan >= 55);
-                Assert.True(summary.WorstMakespan >= summary.BestMakespan);
-                Assert.True(summary.AverageMakespan >= summary.BestMakespan);
+                Assert.True(
+                    summary.WorstMakespan >=
+                    summary.BestMakespan);
+
+                Assert.True(
+                    summary.AverageMakespan >=
+                    summary.BestMakespan);
             });
     }
 }

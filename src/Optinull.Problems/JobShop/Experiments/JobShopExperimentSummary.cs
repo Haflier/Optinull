@@ -22,6 +22,8 @@ public sealed class JobShopExperimentSummary
 
     public TimeSpan AverageElapsed { get; }
 
+    public double AverageEvaluationCount { get; }
+
     public JobShopExperimentSummary(
         string solverName,
         IEnumerable<JobShopExperimentResult> runs,
@@ -36,7 +38,8 @@ public sealed class JobShopExperimentSummary
 
         ArgumentNullException.ThrowIfNull(runs);
 
-        var runList = runs.ToList();
+        var runList =
+            runs.ToList();
 
         if (runList.Count == 0)
         {
@@ -67,24 +70,33 @@ public sealed class JobShopExperimentSummary
         Runs = runList;
 
         BestMakespan =
-            runList.Min(run => run.Makespan);
+            runList.Min(
+                run => run.Makespan);
 
         WorstMakespan =
-            runList.Max(run => run.Makespan);
+            runList.Max(
+                run => run.Makespan);
 
         AverageMakespan =
-            runList.Average(run => run.Makespan);
+            runList.Average(
+                run => run.Makespan);
 
         BestElapsed =
-            runList.Min(run => run.Elapsed);
+            runList.Min(
+                run => run.Elapsed);
 
         WorstElapsed =
-            runList.Max(run => run.Elapsed);
+            runList.Max(
+                run => run.Elapsed);
 
         AverageElapsed =
             TimeSpan.FromTicks(
                 (long)runList.Average(
                     run => run.Elapsed.Ticks));
+
+        AverageEvaluationCount =
+            runList.Average(
+                run => run.EvaluationCount);
 
         if (knownOptimalMakespan.HasValue)
         {

@@ -11,34 +11,36 @@ public sealed class JobShopExperimentSummaryTests
             new[]
             {
                 new JobShopExperimentResult(
-                    "Simulated Annealing",
-                    makespan: 11,
-                    elapsed: TimeSpan.FromMilliseconds(10)),
+                    "Hill Climbing",
+                    11,
+                    TimeSpan.FromMilliseconds(10),
+                    100),
 
                 new JobShopExperimentResult(
-                    "Simulated Annealing",
-                    makespan: 13,
-                    elapsed: TimeSpan.FromMilliseconds(20)),
+                    "Hill Climbing",
+                    13,
+                    TimeSpan.FromMilliseconds(20),
+                    150),
 
                 new JobShopExperimentResult(
-                    "Simulated Annealing",
-                    makespan: 12,
-                    elapsed: TimeSpan.FromMilliseconds(30))
+                    "Hill Climbing",
+                    12,
+                    TimeSpan.FromMilliseconds(15),
+                    125)
             };
 
         var summary =
             new JobShopExperimentSummary(
-                "Simulated Annealing",
-                runs,
-                knownOptimalMakespan: 11);
+                "Hill Climbing",
+                runs);
 
         Assert.Equal(
-            "Simulated Annealing",
+            "Hill Climbing",
             summary.SolverName);
 
         Assert.Equal(
-            3,
-            summary.Runs.Count);
+            runs,
+            summary.Runs);
 
         Assert.Equal(
             11,
@@ -53,37 +55,81 @@ public sealed class JobShopExperimentSummaryTests
             summary.AverageMakespan);
 
         Assert.Equal(
-            1.0 / 3.0,
-            summary.SuccessRate,
-            precision: 10);
-
-        Assert.Equal(
-            ((0.0 + (2.0 / 11.0) + (1.0 / 11.0)) / 3.0),
-            summary.AverageOptimalityGap,
-            precision: 10);
-
-        Assert.Equal(
             TimeSpan.FromMilliseconds(10),
             summary.BestElapsed);
 
         Assert.Equal(
-            TimeSpan.FromMilliseconds(30),
+            TimeSpan.FromMilliseconds(20),
             summary.WorstElapsed);
 
         Assert.Equal(
-            TimeSpan.FromMilliseconds(20),
+            TimeSpan.FromMilliseconds(15),
             summary.AverageElapsed);
+
+        Assert.True(
+            double.IsNaN(summary.SuccessRate));
+
+        Assert.True(
+            double.IsNaN(summary.AverageOptimalityGap));
     }
 
     [Fact]
-    public void Constructor_ReturnsFullSuccess_WhenEveryRunReachesOptimum()
+    public void Constructor_CalculatesSuccessRateAndAverageOptimalityGap()
     {
         var runs =
             new[]
             {
-                CreateRun(11),
-                CreateRun(11),
-                CreateRun(11)
+                new JobShopExperimentResult(
+                    "Hill Climbing",
+                    11,
+                    TimeSpan.Zero,
+                    100),
+
+                new JobShopExperimentResult(
+                    "Hill Climbing",
+                    12,
+                    TimeSpan.Zero,
+                    110),
+
+                new JobShopExperimentResult(
+                    "Hill Climbing",
+                    11,
+                    TimeSpan.Zero,
+                    120)
+            };
+
+        var summary =
+            new JobShopExperimentSummary(
+                "Hill Climbing",
+                runs,
+                knownOptimalMakespan: 11);
+
+        Assert.Equal(
+            2.0 / 3.0,
+            summary.SuccessRate);
+
+        Assert.Equal(
+            (0.0 + (1.0 / 11.0) + 0.0) / 3.0,
+            summary.AverageOptimalityGap);
+    }
+
+    [Fact]
+    public void Constructor_AllRunsOptimal_HasFullSuccessRate()
+    {
+        var runs =
+            new[]
+            {
+                new JobShopExperimentResult(
+                    "Hill Climbing",
+                    11,
+                    TimeSpan.Zero,
+                    100),
+
+                new JobShopExperimentResult(
+                    "Hill Climbing",
+                    11,
+                    TimeSpan.Zero,
+                    100)
             };
 
         var summary =
@@ -102,12 +148,22 @@ public sealed class JobShopExperimentSummaryTests
     }
 
     [Fact]
-    public void Constructor_AllowsMissingKnownOptimum()
+    public void Constructor_AllowsMissingKnownOptimalMakespan()
     {
+        var runs =
+            new[]
+            {
+                new JobShopExperimentResult(
+                    "Hill Climbing",
+                    11,
+                    TimeSpan.Zero,
+                    100)
+            };
+
         var summary =
             new JobShopExperimentSummary(
                 "Hill Climbing",
-                [CreateRun(11)]);
+                runs);
 
         Assert.True(
             double.IsNaN(summary.SuccessRate));
@@ -127,16 +183,22 @@ public sealed class JobShopExperimentSummaryTests
     }
 
     [Fact]
-    public void Constructor_RejectsRunsFromDifferentSolver()
+    public void Constructor_RejectsMixedSolverNames()
     {
         var runs =
             new[]
             {
-                CreateRun(11),
                 new JobShopExperimentResult(
-                    "Genetic Algorithm",
+                    "Hill Climbing",
                     11,
-                    TimeSpan.Zero)
+                    TimeSpan.Zero,
+                    100),
+
+                new JobShopExperimentResult(
+                    "Simulated Annealing",
+                    12,
+                    TimeSpan.Zero,
+                    100)
             };
 
         Assert.Throws<ArgumentException>(
@@ -146,12 +208,38 @@ public sealed class JobShopExperimentSummaryTests
                     runs));
     }
 
-    private static JobShopExperimentResult CreateRun(
-        double makespan)
+    [Fact]
+    public void Constructor_CalculatesAverageEvaluationCount()
     {
-        return new JobShopExperimentResult(
-            "Hill Climbing",
-            makespan,
-            TimeSpan.Zero);
+        var runs =
+            new[]
+            {
+                new JobShopExperimentResult(
+                    "Hill Climbing",
+                    11,
+                    TimeSpan.Zero,
+                    100),
+
+                new JobShopExperimentResult(
+                    "Hill Climbing",
+                    12,
+                    TimeSpan.Zero,
+                    200),
+
+                new JobShopExperimentResult(
+                    "Hill Climbing",
+                    13,
+                    TimeSpan.Zero,
+                    300)
+            };
+
+        var summary =
+            new JobShopExperimentSummary(
+                "Hill Climbing",
+                runs);
+
+        Assert.Equal(
+            200,
+            summary.AverageEvaluationCount);
     }
 }
