@@ -114,18 +114,31 @@ public sealed class JobShopExperimentRunner
             var seed =
                 startingRandomSeed + run;
 
+            var runInitialSequence =
+                new JobShopSequenceGenerator()
+                    .Generate(
+                        problem,
+                        new Random(seed));
+
+            var runInitialMakespan =
+                evaluator
+                    .Evaluate(
+                        problem,
+                        runInitialSequence)
+                    .ObjectiveValue;
+
             hillClimbingRuns.Add(
                 RunHillClimbing(
                     problem,
-                    initialSequence,
-                    initialMakespan,
+                    runInitialSequence,
+                    runInitialMakespan,
                     knownOptimalMakespan));
 
             simulatedAnnealingRuns.Add(
                 RunSimulatedAnnealing(
                     problem,
-                    initialSequence,
-                    initialMakespan,
+                    runInitialSequence,
+                    runInitialMakespan,
                     knownOptimalMakespan,
                     seed));
 
@@ -138,8 +151,8 @@ public sealed class JobShopExperimentRunner
             iteratedLocalSearchRuns.Add(
                 RunIteratedLocalSearch(
                     problem,
-                    initialSequence,
-                    initialMakespan,
+                    runInitialSequence,
+                    runInitialMakespan,
                     knownOptimalMakespan,
                     seed));
         }
@@ -214,6 +227,7 @@ public sealed class JobShopExperimentRunner
 
         var solver =
             new JobShopSimulatedAnnealingSolver(
+                iterationsPerTemperature: 90,
                 random: new Random(randomSeed),
                 evaluator: countingEvaluator);
 
@@ -248,7 +262,7 @@ public sealed class JobShopExperimentRunner
         var solver =
             new JobShopGeneticAlgorithmSolver(
                 populationSize: 50,
-                generations: 44,
+                generations: 399,
                 eliteCount: 2,
                 mutationRate: 0.1,
                 random: new Random(randomSeed),

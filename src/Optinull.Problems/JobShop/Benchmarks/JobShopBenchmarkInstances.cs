@@ -11,12 +11,12 @@ public static class JobShopBenchmarkInstances
                 new Job(
                     0,
                     [
-                        new JobOperation(0, 1),
-                        new JobOperation(1, 3),
-                        new JobOperation(2, 6),
+                        new JobOperation(2, 1),
+                        new JobOperation(0, 3),
+                        new JobOperation(1, 6),
                         new JobOperation(3, 7),
-                        new JobOperation(4, 3),
-                        new JobOperation(5, 6)
+                        new JobOperation(5, 3),
+                        new JobOperation(4, 6)
                     ]),
 
                 new Job(
@@ -45,8 +45,8 @@ public static class JobShopBenchmarkInstances
                     3,
                     [
                         new JobOperation(1, 5),
-                        new JobOperation(2, 5),
                         new JobOperation(0, 5),
+                        new JobOperation(2, 5),
                         new JobOperation(3, 3),
                         new JobOperation(4, 8),
                         new JobOperation(5, 9)
@@ -56,21 +56,21 @@ public static class JobShopBenchmarkInstances
                     4,
                     [
                         new JobOperation(2, 9),
-                        new JobOperation(3, 3),
-                        new JobOperation(5, 5),
-                        new JobOperation(0, 4),
                         new JobOperation(1, 3),
-                        new JobOperation(4, 1)
+                        new JobOperation(4, 5),
+                        new JobOperation(5, 4),
+                        new JobOperation(0, 3),
+                        new JobOperation(3, 1)
                     ]),
 
                 new Job(
                     5,
                     [
                         new JobOperation(1, 3),
-                        new JobOperation(0, 3),
-                        new JobOperation(3, 9),
-                        new JobOperation(4, 10),
-                        new JobOperation(5, 4),
+                        new JobOperation(3, 3),
+                        new JobOperation(5, 9),
+                        new JobOperation(0, 10),
+                        new JobOperation(4, 4),
                         new JobOperation(2, 1)
                     ])
             ]);
