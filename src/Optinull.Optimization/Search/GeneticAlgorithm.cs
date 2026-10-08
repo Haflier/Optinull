@@ -102,11 +102,17 @@ public sealed class GeneticAlgorithm<TSolution> : ISearchSolver<TSolution>
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (BudgetReached(run))
+                break;
+
             var individual = Evaluate(run, problem.CreateRandom(_random));
             initial.Add(Improve(run, problem, individual));
         }
 
         var population = Rank(run, initial);
+
+        if (population.Count == 0)
+            return run.Complete();
 
         for (var generation = 0; generation < _generations; generation++)
         {

@@ -56,6 +56,60 @@ public sealed class GeneticAlgorithmSearchTests
         Assert.Equal(20 + 10 * 18, result.EvaluationCount);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(19)]
+    public void Solve_DoesNotExceedBudgetDuringInitialPopulation(int maxEvaluations)
+    {
+        var result = new GeneticAlgorithm<Solution>(
+                populationSize: 20,
+                generations: 10,
+                maxEvaluations: maxEvaluations,
+                random: new RandomSource(1))
+            .Solve(CreateProblem());
+
+        Assert.Equal(maxEvaluations, result.EvaluationCount);
+    }
+
+    [Fact]
+    public void Solve_UsesBudgetAcrossInitialPopulationAndGenerations()
+    {
+        var result = new GeneticAlgorithm<Solution>(
+                populationSize: 10,
+                generations: 10,
+                eliteCount: 2,
+                maxEvaluations: 25,
+                random: new RandomSource(1))
+            .Solve(CreateProblem());
+
+        Assert.Equal(25, result.EvaluationCount);
+    }
+
+    [Fact]
+    public void Constructor_RejectsNonPositiveEvaluationBudget()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new GeneticAlgorithm<Solution>(maxEvaluations: 0));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new GeneticAlgorithm<Solution>(maxEvaluations: -1));
+    }
+
+    [Fact]
+    public void Solve_WithBudgetEqualToPopulation_DoesNotStartGeneration()
+    {
+        var result = new GeneticAlgorithm<Solution>(
+                populationSize: 10,
+                generations: 10,
+                eliteCount: 2,
+                maxEvaluations: 10,
+                random: new RandomSource(1))
+            .Solve(CreateProblem());
+
+        Assert.Equal(10, result.EvaluationCount);
+    }
+
     [Fact]
     public void Solve_WithCancelledToken_Throws()
     {
