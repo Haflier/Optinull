@@ -5,7 +5,8 @@ namespace Optinull.Problems.JobShop;
 
 /// <summary>
 /// GA configuration tuned on FT06 (30 seeds, 20,000 evaluations): the optimum
-/// of 55 was reached on every seed. The operators and the GA parameters belong
+/// of 55 was reached on every seed. On FT10 it trails simulated annealing
+/// at the same budget (about 1028 vs 993), so treat it as FT06-tuned. The operators and the GA parameters belong
 /// together, so both are created here.
 /// </summary>
 public static class JobShopGeneticAlgorithmPreset

@@ -29,6 +29,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Optinull.Problems.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Optinull.Integration.Tests", "tests\Optinull.Integration.Tests\Optinull.Integration.Tests.csproj", "{CA13AAA6-BDB2-439F-B941-558840FB49BC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Optinull.Reporting.Tests", "tests\Optinull.Reporting.Tests\Optinull.Reporting.Tests.csproj", "{B03A1437-BB5D-4197-ACF3-4C4BCB0A583B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -82,6 +84,10 @@ Global
 		{CA13AAA6-BDB2-439F-B941-558840FB49BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CA13AAA6-BDB2-439F-B941-558840FB49BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CA13AAA6-BDB2-439F-B941-558840FB49BC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B03A1437-BB5D-4197-ACF3-4C4BCB0A583B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B03A1437-BB5D-4197-ACF3-4C4BCB0A583B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B03A1437-BB5D-4197-ACF3-4C4BCB0A583B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B03A1437-BB5D-4197-ACF3-4C4BCB0A583B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{DB2414E4-A0DE-45A9-A8F8-A3108B4E2497} = {9B6D2303-88A3-462A-B2AE-7E37BC24A839}
@@ -95,5 +101,6 @@ Global
 		{D50D569D-EDAC-4600-981E-956750351787} = {C49931EF-84F4-4CAC-AC49-B6ACD50ED2EF}
 		{BE668FBD-464E-4835-8112-E987098282CB} = {C49931EF-84F4-4CAC-AC49-B6ACD50ED2EF}
 		{CA13AAA6-BDB2-439F-B941-558840FB49BC} = {C49931EF-84F4-4CAC-AC49-B6ACD50ED2EF}
+		{B03A1437-BB5D-4197-ACF3-4C4BCB0A583B} = {C49931EF-84F4-4CAC-AC49-B6ACD50ED2EF}
 	EndGlobalSection
 EndGlobal
