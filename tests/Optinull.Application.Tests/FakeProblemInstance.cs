@@ -11,7 +11,7 @@ internal sealed class FakeProblemInstance : IProblemInstance
 
     public SolveReport Solve(
         SolverKind solver,
-        int seed,
+        SolveOptions options,
         CancellationToken cancellationToken) =>
         new("fake solver", [new ReportImage("fake.png", "caption", [1, 2, 3])]);
 }

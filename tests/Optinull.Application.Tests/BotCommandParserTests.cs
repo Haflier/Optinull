@@ -65,4 +65,56 @@ public sealed class BotCommandParserTests
     [InlineData("/cancel@OptinullBot")]
     public void Cancel_ParsesAsCancel(string text) =>
         Assert.IsType<CancelCommand>(BotCommandParser.Parse(text));
+
+    [Theory]
+    [InlineData("/solve ft06 iterations=1000", 1000)]
+    [InlineData("/solve ft06 iteration=1000", 1000)]
+    [InlineData("/solve ft06 ITER=1000", 1000)]
+    [InlineData("/solve ft06 it=100000", 100_000)]
+    public void Solve_ParsesIterationsAliases(string text, int iterations)
+    {
+        var command = Assert.IsType<SolveCommand>(BotCommandParser.Parse(text));
+
+        Assert.Equal(iterations, command.Iterations);
+        Assert.Empty(command.ParameterValues);
+    }
+
+    [Fact]
+    public void Solve_WithoutIterations_LeavesThemUnset()
+    {
+        var command = Assert.IsType<SolveCommand>(BotCommandParser.Parse("/solve ft06 ga"));
+
+        Assert.Null(command.Iterations);
+        Assert.Null(command.Seed);
+    }
+
+    [Theory]
+    [InlineData("/solve tsp ga iterations=500 cities=30 seed=7")]
+    [InlineData("/solve tsp cities=30 seed=7 iterations=500 ga")]
+    [InlineData("/solve tsp iterations=500 GA seed=7 cities=30")]
+    public void Solve_AcceptsSolverIterationsSeedAndSettingsInAnyOrder(string text)
+    {
+        var command = Assert.IsType<SolveCommand>(BotCommandParser.Parse(text));
+
+        Assert.Equal("tsp", command.Target);
+        Assert.Equal(SolverKind.GeneticAlgorithm, command.Solver);
+        Assert.Equal(500, command.Iterations);
+        Assert.Equal(7, command.Seed);
+        Assert.Equal("30", Assert.Single(command.ParameterValues).Value);
+        Assert.Equal("cities", command.ParameterValues.Keys.Single());
+    }
+
+    [Theory]
+    [InlineData("/solve ft06 iterations=abc")]
+    [InlineData("/solve ft06 iterations=-5")]
+    [InlineData("/solve ft06 iterations=99")]
+    [InlineData("/solve ft06 iterations=100001")]
+    [InlineData("/solve ft06 iterations=")]
+    [InlineData("/solve ft06 iterations=500 iter=600")]
+    [InlineData("/solve ft06 seed=x")]
+    [InlineData("/solve tsp cities=5 cities=6")]
+    [InlineData("/solve tsp sa ga")]
+    [InlineData("/solve tsp =5")]
+    public void BadOptions_ParseAsInvalid(string text) =>
+        Assert.IsType<InvalidCommand>(BotCommandParser.Parse(text));
 }

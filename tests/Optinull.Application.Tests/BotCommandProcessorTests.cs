@@ -215,4 +215,86 @@ public sealed class BotCommandProcessorTests
         Assert.Contains("Too many jobs", replies.Texts[0]);
         Assert.False(queue.Reader.TryRead(out _));
     }
+
+    [Fact]
+    public async Task RandomTsp_FromSettings_IsQueuedWithOptions()
+    {
+        var (processor, queue) = Create();
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync("/solve tsp ga iterations=500 cities=12 seed=3", 1, replies);
+
+        Assert.Contains("Queued job #1", replies.Texts[0]);
+        Assert.Contains("12 cities", replies.Texts[0]);
+        Assert.Contains("500 iterations", replies.Texts[0]);
+
+        Assert.True(queue.Reader.TryRead(out var job));
+        Assert.Equal("tsp12", job.Instance.Name);
+        Assert.Equal(500, job.Command.Iterations);
+        Assert.Equal(3, job.Command.Seed);
+    }
+
+    [Fact]
+    public async Task RandomJobShop_UsesDefaultsForMissingSettings()
+    {
+        var (processor, queue) = Create();
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync("/solve jobshop machines=4", 1, replies);
+
+        Assert.Contains("6 jobs x 4 machines", replies.Texts[0]);
+        Assert.True(queue.Reader.TryRead(out _));
+    }
+
+    [Theory]
+    [InlineData("/solve tsp cities=2", "cities must be")]
+    [InlineData("/solve tsp cities=many", "cities must be")]
+    [InlineData("/solve tsp jobs=3", "Unknown parameter 'jobs'")]
+    [InlineData("/solve jobshop jobs=20 machines=21", "machines must be")]
+    public async Task BadSettings_AreRejected_WithTheReason(string text, string reason)
+    {
+        var (processor, queue) = Create();
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync(text, 1, replies);
+
+        Assert.Single(replies.Texts);
+        Assert.Contains(reason, replies.Texts[0]);
+        Assert.False(queue.Reader.TryRead(out _));
+    }
+
+    [Fact]
+    public async Task SettingsOnAFixedInstance_AreRejected()
+    {
+        var (processor, queue) = Create();
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync("/solve ft06 cities=5", 1, replies);
+
+        Assert.Contains("takes no settings", replies.Texts[0]);
+        Assert.False(queue.Reader.TryRead(out _));
+    }
+
+    [Fact]
+    public async Task InstanceLinesTogetherWithSettings_AreRejected()
+    {
+        var (processor, queue) = Create();
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync("/solve tsp cities=5\n0 0\n1 0\n1 1", 1, replies);
+
+        Assert.Contains("not both", replies.Texts[0]);
+        Assert.False(queue.Reader.TryRead(out _));
+    }
+
+    [Fact]
+    public async Task IterationsOnABuiltIn_TravelWithTheJob()
+    {
+        var (processor, queue) = Create();
+
+        await processor.ProcessAsync("/solve ft06 ga iterations=2000", 1, new FakeReplies());
+
+        Assert.True(queue.Reader.TryRead(out var job));
+        Assert.Equal(2000, job.Command.Iterations);
+    }
 }

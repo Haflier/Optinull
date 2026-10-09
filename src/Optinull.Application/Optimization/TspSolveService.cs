@@ -23,8 +23,9 @@ public sealed class TspSolveService
     public TspSolveResult Solve(
         TspProblem problem,
         SolverKind kind = SolverKind.SimulatedAnnealing,
-        int seed = 42,
-        CancellationToken cancellationToken = default)
+        int seed = SolveOptions.DefaultSeed,
+        CancellationToken cancellationToken = default,
+        int? iterations = null)
     {
         ArgumentNullException.ThrowIfNull(problem);
 
@@ -52,8 +53,8 @@ public sealed class TspSolveService
                 name = "Simulated Annealing";
                 search = new SimulatedAnnealing<TspTour>(
                         initialTemperature: start,
-                        coolingRate: 0.95,
-                        iterationsPerTemperature: 90,
+                        coolingRate: AnnealingBudget.CoolingRate(iterations),
+                        iterationsPerTemperature: AnnealingBudget.IterationsPerTemperature,
                         minimumTemperature: start * 1e-5,
                         random: random)
                     .Solve(searchProblem, cancellationToken);
@@ -69,7 +70,7 @@ public sealed class TspSolveService
                         mutationRate: 0.2,
                         tournamentSize: 3,
                         localSearchTries: 10,
-                        maxEvaluations: EvaluationBudget,
+                        maxEvaluations: iterations ?? EvaluationBudget,
                         random: random)
                     .Solve(searchProblem, cancellationToken);
                 break;

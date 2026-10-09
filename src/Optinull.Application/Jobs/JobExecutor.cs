@@ -1,11 +1,11 @@
+using Optinull.Application.Optimization;
+
 namespace Optinull.Application.Jobs;
 
 /// <summary>Runs one job: solve, reply with the charts. Honors cancel and a time limit.</summary>
 public sealed class JobExecutor
 {
     public static readonly TimeSpan DefaultTimeLimit = TimeSpan.FromSeconds(60);
-
-    private const int Seed = 42;
 
     private readonly TimeSpan _timeLimit;
 
@@ -43,8 +43,12 @@ public sealed class JobExecutor
                 $"Solving job #{job.Id}: {job.Instance.Description} ({job.Command.Solver})...",
                 token);
 
+            var options = new SolveOptions(
+                job.Command.Seed ?? SolveOptions.DefaultSeed,
+                job.Command.Iterations);
+
             var report = await Task.Run(
-                () => job.Instance.Solve(job.Command.Solver, Seed, token),
+                () => job.Instance.Solve(job.Command.Solver, options, token),
                 token);
 
             // A solver that ignores the token still must not send a cancelled job's result.

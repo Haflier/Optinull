@@ -13,7 +13,17 @@ public sealed record HelpCommand : BotCommand;
 public sealed record SolveCommand(
     string Target,
     SolverKind Solver,
-    string? InstanceText = null) : BotCommand;
+    string? InstanceText = null,
+    int? Iterations = null,
+    int? Seed = null,
+    IReadOnlyDictionary<string, string>? Parameters = null) : BotCommand
+{
+    private static readonly IReadOnlyDictionary<string, string> None =
+        new Dictionary<string, string>();
+
+    /// <summary>Problem settings such as cities=30; never null.</summary>
+    public IReadOnlyDictionary<string, string> ParameterValues => Parameters ?? None;
+}
 
 public sealed record CancelCommand : BotCommand;
 

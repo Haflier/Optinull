@@ -30,6 +30,41 @@ public sealed class JobShopModule : IProblemModule
         }
     }
 
+    public IReadOnlyList<ProblemParameter> Parameters { get; } =
+    [
+        new("jobs", "number of random jobs", 1, JobShopInputLimits.Default.MaxJobs, 6),
+        new("machines", "number of machines", 1, JobShopInputLimits.Default.MaxMachines, 6)
+    ];
+
+    public bool TryGenerate(
+        IReadOnlyDictionary<string, string> values,
+        int seed,
+        [NotNullWhen(true)] out IProblemInstance? instance,
+        out string? error)
+    {
+        instance = null;
+
+        if (!ProblemParameterReader.TryRead(Parameters, values, out var read, out error))
+            return false;
+
+        var jobs = read["jobs"];
+        var machines = read["machines"];
+
+        if (jobs * machines > JobShopInputLimits.Default.MaxOperations)
+        {
+            error = $"jobs x machines must be at most {JobShopInputLimits.Default.MaxOperations} operations.";
+            return false;
+        }
+
+        instance = new JobShopInstance(
+            $"jobshop{jobs}x{machines}",
+            $"random job shop, {jobs} jobs x {machines} machines (seed {seed})",
+            JobShopRandomInstances.Generate(jobs, machines, seed),
+            knownOptimum: null);
+
+        return true;
+    }
+
     public bool TryGetBuiltIn(
         string name,
         [NotNullWhen(true)] out IProblemInstance? instance)
@@ -97,10 +132,15 @@ internal sealed class JobShopInstance : IProblemInstance
 
     public SolveReport Solve(
         SolverKind solver,
-        int seed,
+        SolveOptions options,
         CancellationToken cancellationToken)
     {
-        var result = new JobShopSolveService().Solve(_problem, solver, seed, cancellationToken);
+        var result = new JobShopSolveService().Solve(
+            _problem,
+            solver,
+            options.Seed,
+            cancellationToken,
+            options.Iterations);
         var report = new JobShopReportService().Render(_problem, result);
 
         return new SolveReport(

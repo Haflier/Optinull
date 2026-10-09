@@ -27,6 +27,33 @@ public sealed class TspModule : IProblemModule
         }
     }
 
+    public IReadOnlyList<ProblemParameter> Parameters { get; } =
+    [
+        new("cities", "number of random cities", 3, TspInputLimits.Default.MaxCities, 20)
+    ];
+
+    public bool TryGenerate(
+        IReadOnlyDictionary<string, string> values,
+        int seed,
+        [NotNullWhen(true)] out IProblemInstance? instance,
+        out string? error)
+    {
+        instance = null;
+
+        if (!ProblemParameterReader.TryRead(Parameters, values, out var read, out error))
+            return false;
+
+        var cities = read["cities"];
+
+        instance = new TspInstance(
+            $"tsp{cities}",
+            $"random tour, {cities} cities (seed {seed})",
+            TspBenchmarkInstances.RandomCities(cities, seed),
+            knownOptimum: null);
+
+        return true;
+    }
+
     public bool TryGetBuiltIn(
         string name,
         [NotNullWhen(true)] out IProblemInstance? instance)
@@ -106,10 +133,15 @@ internal sealed class TspInstance : IProblemInstance
 
     public SolveReport Solve(
         SolverKind solver,
-        int seed,
+        SolveOptions options,
         CancellationToken cancellationToken)
     {
-        var result = new TspSolveService().Solve(_problem, solver, seed, cancellationToken);
+        var result = new TspSolveService().Solve(
+            _problem,
+            solver,
+            options.Seed,
+            cancellationToken,
+            options.Iterations);
 
         var route = new RouteChartRenderer().Render(
             _problem.Cities.Select(city => new RoutePoint(city.X, city.Y)).ToList(),

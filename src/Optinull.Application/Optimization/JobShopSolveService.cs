@@ -19,8 +19,9 @@ public sealed class JobShopSolveService
     public JobShopSolveResult Solve(
         JobShopProblem problem,
         SolverKind kind = SolverKind.SimulatedAnnealing,
-        int seed = 42,
-        CancellationToken cancellationToken = default)
+        int seed = SolveOptions.DefaultSeed,
+        CancellationToken cancellationToken = default,
+        int? iterations = null)
     {
         ArgumentNullException.ThrowIfNull(problem);
 
@@ -34,7 +35,8 @@ public sealed class JobShopSolveService
             case SolverKind.SimulatedAnnealing:
                 name = "Simulated Annealing";
                 search = new SimulatedAnnealing<JobSequence>(
-                        iterationsPerTemperature: 90,
+                        coolingRate: AnnealingBudget.CoolingRate(iterations),
+                        iterationsPerTemperature: AnnealingBudget.IterationsPerTemperature,
                         random: random)
                     .Solve(new JobShopSearchProblem(problem), cancellationToken);
                 break;
@@ -42,7 +44,9 @@ public sealed class JobShopSolveService
             case SolverKind.GeneticAlgorithm:
                 name = "Genetic Algorithm";
                 search = JobShopGeneticAlgorithmPreset
-                    .CreateSolver(random: random)
+                    .CreateSolver(
+                        iterations ?? JobShopGeneticAlgorithmPreset.DefaultMaxEvaluations,
+                        random)
                     .Solve(
                         JobShopGeneticAlgorithmPreset.CreateProblem(problem),
                         cancellationToken);

@@ -1,5 +1,6 @@
 using System.Text;
 using Optinull.Application.Jobs;
+using Optinull.Application.Optimization;
 using Optinull.Application.Problems;
 
 namespace Optinull.Application.Commands;
@@ -26,18 +27,25 @@ public sealed class BotCommandProcessor
 
             text.AppendLine("I solve optimization problems and send back charts.");
             text.AppendLine();
-            text.AppendLine("/solve <instance> [sa|ga]");
+            text.AppendLine("/solve <problem> [sa|ga] [iterations=N] [seed=N] [key=value ...]");
             text.AppendLine($"Built-in instances: {string.Join(", ", _registry.BuiltInNames)}");
             text.AppendLine("sa = simulated annealing (default), ga = genetic algorithm");
+            text.AppendLine(
+                $"iterations = candidate solutions to evaluate, " +
+                $"{SolveLimits.MinIterations}-{SolveLimits.MaxIterations} (default: solver's own)");
+            text.AppendLine("seed = same seed, same result");
             text.AppendLine();
             text.AppendLine(
                 "Your own problem: /solve <problem> [sa|ga] with the instance on the " +
                 "next lines, or attach a .txt file with that as the caption.");
+            text.AppendLine("Or a random one: give the problem's settings instead of lines.");
 
             foreach (var module in _registry.Modules)
             {
                 text.AppendLine();
                 text.AppendLine($"{module.Id} ({module.Title}): {module.CustomInputHelp}");
+                text.AppendLine(
+                    $"Random: /solve {module.Id} {ProblemParameterReader.Describe(module.Parameters)}");
             }
 
             text.AppendLine();
@@ -84,28 +92,66 @@ public sealed class BotCommandProcessor
         IProblemInstance? instance;
 
         var module = _registry.FindModule(command.Target);
+        var settings = command.ParameterValues;
 
         if (module is not null)
         {
-            // "/solve tsp": the instance follows the command.
-            if (command.InstanceText is null)
+            if (command.InstanceText is not null)
+            {
+                // "/solve tsp" with lines: the user's own instance.
+                if (settings.Count > 0)
+                {
+                    await replies.SendTextAsync(
+                        $"Send either instance lines or settings ({string.Join(", ", settings.Keys)}), not both.",
+                        cancellationToken);
+                    return;
+                }
+
+                if (!module.TryParseCustom(command.InstanceText, out instance, out var error))
+                {
+                    await replies.SendTextAsync(
+                        $"Invalid instance: {error}\n\nSend /help to see the format.",
+                        cancellationToken);
+                    return;
+                }
+            }
+            else if (settings.Count > 0)
+            {
+                // "/solve tsp cities=30": a random instance.
+                var seed = command.Seed ?? SolveOptions.DefaultSeed;
+
+                if (!module.TryGenerate(settings, seed, out instance, out var error))
+                {
+                    await replies.SendTextAsync(
+                        $"Invalid settings: {error}\n\n" +
+                        $"{module.Id}: {ProblemParameterReader.Describe(module.Parameters)}",
+                        cancellationToken);
+                    return;
+                }
+            }
+            else
             {
                 await replies.SendTextAsync(
                     "Send the instance on the lines after the command, or attach it as " +
-                    $"a .txt file.\n\n{module.Id} ({module.Title}): {module.CustomInputHelp}",
-                    cancellationToken);
-                return;
-            }
-
-            if (!module.TryParseCustom(command.InstanceText, out instance, out var error))
-            {
-                await replies.SendTextAsync(
-                    $"Invalid instance: {error}\n\nSend /help to see the format.",
+                    $"a .txt file, or ask for a random one: " +
+                    $"/solve {module.Id} {ProblemParameterReader.Describe(module.Parameters)}" +
+                    $"\n\n{module.Id} ({module.Title}): {module.CustomInputHelp}",
                     cancellationToken);
                 return;
             }
         }
-        else if (!_registry.TryGetBuiltIn(command.Target, out instance))
+        else if (_registry.TryGetBuiltIn(command.Target, out instance))
+        {
+            if (settings.Count > 0)
+            {
+                await replies.SendTextAsync(
+                    $"{command.Target} is a fixed instance, so it takes no settings " +
+                    $"({string.Join(", ", settings.Keys)}). Only sa|ga, iterations= and seed= apply.",
+                    cancellationToken);
+                return;
+            }
+        }
+        else
         {
             await replies.SendTextAsync(
                 $"Unknown instance '{command.Target}'. " +
@@ -121,7 +167,8 @@ public sealed class BotCommandProcessor
         var message = _queue.TryEnqueue(chatId, queued, replies, instance!) switch
         {
             Enqueued enqueued =>
-                $"Queued job #{enqueued.Job.Id} ({instance!.Description}, {command.Solver}). " +
+                $"Queued job #{enqueued.Job.Id} ({instance!.Description}, {command.Solver}" +
+                $"{(command.Iterations is { } n ? $", {n} iterations" : string.Empty)}). " +
                 "I'll send the charts when it's done. Send /cancel to stop it.",
 
             AlreadyActive active =>

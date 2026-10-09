@@ -56,4 +56,20 @@ public sealed class TspSolveServiceTests
             service.Solve(problem, SolverKind.SimulatedAnnealing, seed: 9).Length,
             service.Solve(problem, SolverKind.SimulatedAnnealing, seed: 9).Length);
     }
+
+    [Theory]
+    [InlineData(SolverKind.SimulatedAnnealing, 900, 800, 1100)]
+    [InlineData(SolverKind.GeneticAlgorithm, 500, 100, 500)]
+    public void Iterations_LimitTheNumberOfEvaluations(
+        SolverKind kind,
+        int iterations,
+        int atLeast,
+        int atMost)
+    {
+        var problem = TspBenchmarkInstances.Circle(20);
+
+        var result = new TspSolveService().Solve(problem, kind, seed: 1, iterations: iterations);
+
+        Assert.InRange(result.Search.EvaluationCount, atLeast, atMost);
+    }
 }
