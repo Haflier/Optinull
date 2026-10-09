@@ -2,6 +2,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Optinull.Domain\Optinull.Domain.csproj" />
+    <ProjectReference Include="..\Optinull.Optimization\Optinull.Optimization.csproj" />
+    <ProjectReference Include="..\Optinull.Problems\Optinull.Problems.csproj" />
+    <ProjectReference Include="..\Optinull.Reporting\Optinull.Reporting.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
