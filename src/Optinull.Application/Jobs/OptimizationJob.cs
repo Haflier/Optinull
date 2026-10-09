@@ -1,5 +1,5 @@
 using Optinull.Application.Commands;
-using Optinull.Problems.JobShop;
+using Optinull.Application.Problems;
 
 namespace Optinull.Application.Jobs;
 
@@ -27,16 +27,17 @@ public sealed class OptimizationJob
         long chatId,
         SolveCommand command,
         IBotReplies replies,
-        JobShopProblem? customProblem = null)
+        IProblemInstance instance)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(replies);
+        ArgumentNullException.ThrowIfNull(instance);
 
         Id = id;
         ChatId = chatId;
         Command = command;
         Replies = replies;
-        CustomProblem = customProblem;
+        Instance = instance;
     }
 
     public long Id { get; }
@@ -47,8 +48,8 @@ public sealed class OptimizationJob
 
     public IBotReplies Replies { get; }
 
-    /// <summary>The user's own problem; null when a built-in benchmark is meant.</summary>
-    public JobShopProblem? CustomProblem { get; }
+    /// <summary>The problem to solve, already resolved or parsed.</summary>
+    public IProblemInstance Instance { get; }
 
     public DateTimeOffset CreatedAt { get; } = DateTimeOffset.UtcNow;
 

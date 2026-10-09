@@ -38,4 +38,19 @@ public static class TspBenchmarkInstances
 
     public static double GridOptimum(int side, double spacing = 10) =>
         side * side * spacing;
+
+    /// <summary>Pseudo-random cities in a square. The optimum is unknown.</summary>
+    public static TspProblem RandomCities(int cityCount, int seed, double size = 1000)
+    {
+        if (cityCount < 3)
+            throw new ArgumentOutOfRangeException(nameof(cityCount));
+
+        var random = new Random(seed);
+
+        return new TspProblem(
+            Enumerable
+                .Range(0, cityCount)
+                .Select(_ => new City(random.NextDouble() * size, random.NextDouble() * size))
+                .ToList());
+    }
 }

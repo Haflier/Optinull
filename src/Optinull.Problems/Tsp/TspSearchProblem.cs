@@ -9,7 +9,9 @@ namespace Optinull.Problems.Tsp;
 /// Adapts a TSP to the generic solvers. Moves are 2-opt (reverse a stretch of
 /// the tour); the genetic algorithm recombines tours with order crossover.
 /// </summary>
-public sealed class TspSearchProblem : IRecombinableProblem<TspTour>
+public sealed class TspSearchProblem :
+    IRecombinableProblem<TspTour>,
+    IConstructiveProblem<TspTour>
 {
     private readonly TspProblem _problem;
 
@@ -137,6 +139,44 @@ public sealed class TspSearchProblem : IRecombinableProblem<TspTour>
 
     public TspTour Mutate(TspTour solution, IRandomSource random) =>
         RandomNeighbor(solution, random);
+
+    /// <summary>Nearest neighbour: from city 0, always go to the closest unvisited city.</summary>
+    public TspTour CreateGreedy(Func<TspTour, EvaluationResult> evaluate)
+    {
+        ArgumentNullException.ThrowIfNull(evaluate);
+
+        var count = _problem.CityCount;
+        var visited = new bool[count];
+        var order = new List<int>(count) { 0 };
+
+        visited[0] = true;
+
+        for (var step = 1; step < count; step++)
+        {
+            var last = order[^1];
+            var best = -1;
+            var bestDistance = double.MaxValue;
+
+            for (var city = 0; city < count; city++)
+            {
+                if (visited[city])
+                    continue;
+
+                var distance = _problem.Distance(last, city);
+
+                if (distance < bestDistance)
+                {
+                    best = city;
+                    bestDistance = distance;
+                }
+            }
+
+            visited[best] = true;
+            order.Add(best);
+        }
+
+        return new TspTour(order);
+    }
 
     private static TspTour Reverse(TspTour tour, int from, int to)
     {

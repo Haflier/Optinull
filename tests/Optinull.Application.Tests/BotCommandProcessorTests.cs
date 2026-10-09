@@ -1,10 +1,13 @@
 using Optinull.Application.Commands;
 using Optinull.Application.Jobs;
+using Optinull.Problems.JobShop.Parsing;
 
 namespace Optinull.Application.Tests;
 
 public sealed class BotCommandProcessorTests
 {
+    private const string SmallJobShop = "2 2\n0 3 1 2\n1 4 0 2";
+
     private static (BotCommandProcessor Processor, JobQueue Queue) Create(int capacity = 10)
     {
         var queue = new JobQueue(capacity);
@@ -12,7 +15,7 @@ public sealed class BotCommandProcessorTests
     }
 
     [Fact]
-    public async Task Help_RepliesWithUsage()
+    public async Task Help_ListsInstancesProblemsAndCancel()
     {
         var (processor, queue) = Create();
         var replies = new FakeReplies();
@@ -22,11 +25,14 @@ public sealed class BotCommandProcessorTests
         Assert.Single(replies.Texts);
         Assert.Contains("/solve", replies.Texts[0]);
         Assert.Contains("/cancel", replies.Texts[0]);
+        Assert.Contains("jobshop", replies.Texts[0]);
+        Assert.Contains("tsp", replies.Texts[0]);
+        Assert.Contains("circle20", replies.Texts[0]);
         Assert.False(queue.Reader.TryRead(out _));
     }
 
     [Fact]
-    public async Task UnknownBenchmark_ListsAvailableOnes_AndDoesNotQueue()
+    public async Task UnknownInstance_ListsWhatIsAvailable_AndDoesNotQueue()
     {
         var (processor, queue) = Create();
         var replies = new FakeReplies();
@@ -35,16 +41,21 @@ public sealed class BotCommandProcessorTests
 
         Assert.Single(replies.Texts);
         Assert.Contains("ft06", replies.Texts[0]);
+        Assert.Contains("circle20", replies.Texts[0]);
         Assert.False(queue.Reader.TryRead(out _));
     }
 
-    [Fact]
-    public async Task Solve_QueuesJob_AndRepliesWithItsId()
+    [Theory]
+    [InlineData("ft06")]
+    [InlineData("circle20")]
+    [InlineData("grid8")]
+    [InlineData("random50")]
+    public async Task BuiltIn_IsQueuedWithItsInstance(string name)
     {
         var (processor, queue) = Create();
         var replies = new FakeReplies();
 
-        await processor.ProcessAsync("/solve ft06", 1, replies);
+        await processor.ProcessAsync($"/solve {name}", 1, replies);
 
         Assert.Single(replies.Texts);
         Assert.Contains("Queued job #1", replies.Texts[0]);
@@ -52,7 +63,7 @@ public sealed class BotCommandProcessorTests
 
         Assert.True(queue.Reader.TryRead(out var job));
         Assert.Equal(JobStatus.Queued, job.Status);
-        Assert.Equal("ft06", job.Command.Benchmark);
+        Assert.Equal(name, job.Instance.Name);
     }
 
     [Fact]
@@ -125,5 +136,83 @@ public sealed class BotCommandProcessorTests
 
         await processor.ProcessAsync("/solve ft06", 1, replies);
         Assert.Contains("Queued job #2", replies.Texts[2]);
+    }
+
+    [Fact]
+    public async Task CustomJobShop_IsQueuedWithItsProblem()
+    {
+        var (processor, queue) = Create();
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync("/solve jobshop\n" + SmallJobShop, 1, replies);
+
+        Assert.Contains("Queued job #1", replies.Texts[0]);
+        Assert.Contains("2 jobs x 2 machines", replies.Texts[0]);
+
+        Assert.True(queue.Reader.TryRead(out var job));
+        Assert.Equal("custom", job.Instance.Name);
+        Assert.Null(job.Command.InstanceText);
+    }
+
+    [Fact]
+    public async Task CustomTsp_IsQueuedWithItsCities()
+    {
+        var (processor, queue) = Create();
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync("/solve tsp ga\n0 0\n10 0\n10 10\n0 10", 1, replies);
+
+        Assert.Contains("Queued job #1", replies.Texts[0]);
+        Assert.Contains("4 cities", replies.Texts[0]);
+        Assert.True(queue.Reader.TryRead(out var job));
+        Assert.Equal("custom", job.Instance.Name);
+    }
+
+    [Theory]
+    [InlineData("/solve jobshop\n2 2\n0 3 1 2", "Expected 2 job lines")]
+    [InlineData("/solve tsp\n0 0\n1 1", "at least 3 cities")]
+    public async Task InvalidCustomInstance_IsRejectedImmediately_WithTheReason(
+        string text,
+        string reason)
+    {
+        var (processor, queue) = Create();
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync(text, 1, replies);
+
+        Assert.Single(replies.Texts);
+        Assert.Contains("Invalid instance", replies.Texts[0]);
+        Assert.Contains(reason, replies.Texts[0]);
+        Assert.False(queue.Reader.TryRead(out _));
+    }
+
+    [Theory]
+    [InlineData("/solve jobshop")]
+    [InlineData("/solve tsp ga")]
+    public async Task CustomWithoutInstance_ExplainsTheFormat(string text)
+    {
+        var (processor, queue) = Create();
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync(text, 1, replies);
+
+        Assert.Single(replies.Texts);
+        Assert.Contains("lines after the command", replies.Texts[0]);
+        Assert.False(queue.Reader.TryRead(out _));
+    }
+
+    [Fact]
+    public async Task OversizedJobShop_IsRejected()
+    {
+        var jobs = JobShopInputLimits.Default.MaxJobs + 1;
+        var lines = string.Join("\n", Enumerable.Repeat("0 1", jobs));
+
+        var (processor, queue) = Create();
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync($"/solve jobshop\n{jobs} 1\n{lines}", 1, replies);
+
+        Assert.Contains("Too many jobs", replies.Texts[0]);
+        Assert.False(queue.Reader.TryRead(out _));
     }
 }

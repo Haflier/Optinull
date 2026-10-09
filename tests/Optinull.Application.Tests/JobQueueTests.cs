@@ -1,13 +1,20 @@
 using Optinull.Application.Commands;
 using Optinull.Application.Jobs;
 using Optinull.Application.Optimization;
+using Optinull.Application.Problems;
 
 namespace Optinull.Application.Tests;
 
 public sealed class JobQueueTests
 {
     private static readonly SolveCommand Command =
-        new("ft06", JobShopSolverKind.SimulatedAnnealing);
+        new("ft06", SolverKind.SimulatedAnnealing);
+
+    private static IProblemInstance Instance()
+    {
+        Assert.True(ProblemRegistry.CreateDefault().TryGetBuiltIn("ft06", out var instance));
+        return instance!;
+    }
 
     [Fact]
     public void FinishedJob_DoesNotBlockTheChat()
@@ -15,12 +22,12 @@ public sealed class JobQueueTests
         var queue = new JobQueue();
 
         var first = Assert.IsType<Enqueued>(
-            queue.TryEnqueue(1, Command, new FakeReplies())).Job;
+            queue.TryEnqueue(1, Command, new FakeReplies(), Instance())).Job;
 
         Assert.True(first.TryStart());
         first.Complete();
 
-        Assert.IsType<Enqueued>(queue.TryEnqueue(1, Command, new FakeReplies()));
+        Assert.IsType<Enqueued>(queue.TryEnqueue(1, Command, new FakeReplies(), Instance()));
     }
 
     [Fact]
@@ -29,12 +36,12 @@ public sealed class JobQueueTests
         var queue = new JobQueue();
 
         var job = Assert.IsType<Enqueued>(
-            queue.TryEnqueue(1, Command, new FakeReplies())).Job;
+            queue.TryEnqueue(1, Command, new FakeReplies(), Instance())).Job;
 
         queue.Release(job);
         queue.Release(job);
 
-        Assert.IsType<Enqueued>(queue.TryEnqueue(1, Command, new FakeReplies()));
+        Assert.IsType<Enqueued>(queue.TryEnqueue(1, Command, new FakeReplies(), Instance()));
     }
 
     [Fact]
@@ -43,7 +50,7 @@ public sealed class JobQueueTests
         var queue = new JobQueue();
 
         var job = Assert.IsType<Enqueued>(
-            queue.TryEnqueue(1, Command, new FakeReplies())).Job;
+            queue.TryEnqueue(1, Command, new FakeReplies(), Instance())).Job;
 
         job.TryStart();
         job.Complete();

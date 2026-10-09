@@ -38,9 +38,9 @@ public sealed class JobWorker : BackgroundService
                     await _executor.ExecuteAsync(job, stoppingToken);
 
                     _logger.LogInformation(
-                        "Job {JobId} ({Benchmark}, {Solver}) {Status} {Error}",
+                        "Job {JobId} ({Target}, {Solver}) {Status} {Error}",
                         job.Id,
-                        job.Command.Benchmark,
+                        job.Command.Target,
                         job.Command.Solver,
                         job.Status,
                         job.Error);

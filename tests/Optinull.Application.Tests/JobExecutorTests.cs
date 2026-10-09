@@ -1,6 +1,7 @@
 using Optinull.Application.Commands;
 using Optinull.Application.Jobs;
 using Optinull.Application.Optimization;
+using Optinull.Application.Problems;
 
 namespace Optinull.Application.Tests;
 
@@ -9,10 +10,16 @@ public sealed class JobExecutorTests
     private static OptimizationJob Enqueue(
         JobQueue queue,
         FakeReplies replies,
-        string benchmark = "ft06",
-        JobShopSolverKind solver = JobShopSolverKind.SimulatedAnnealing)
+        string instanceName = "ft06",
+        SolverKind solver = SolverKind.SimulatedAnnealing)
     {
-        var result = queue.TryEnqueue(1, new SolveCommand(benchmark, solver), replies);
+        Assert.True(ProblemRegistry.CreateDefault().TryGetBuiltIn(instanceName, out var instance));
+
+        var result = queue.TryEnqueue(
+            1,
+            new SolveCommand(instanceName, solver),
+            replies,
+            instance!);
 
         return Assert.IsType<Enqueued>(result).Job;
     }
@@ -50,6 +57,60 @@ public sealed class JobExecutorTests
         Assert.All(replies.Pngs, png => Assert.True(png.Length > 1000));
     }
 
+    [Theory]
+    [InlineData(SolverKind.SimulatedAnnealing)]
+    [InlineData(SolverKind.GeneticAlgorithm)]
+    public async Task Execute_TspCircle_SendsRouteAndConvergence(SolverKind solver)
+    {
+        var queue = new JobQueue();
+        var replies = new FakeReplies();
+        var job = Enqueue(queue, replies, "circle20", solver);
+
+        await new JobExecutor().ExecuteAsync(job);
+
+        Assert.Equal(JobStatus.Completed, job.Status);
+        Assert.Equal(2, replies.Pngs.Count);
+        Assert.Equal("circle20-route.png", replies.Pngs[0].FileName);
+        Assert.Contains("optimal", replies.Pngs[0].Caption);
+        Assert.Equal("circle20-convergence.png", replies.Pngs[1].FileName);
+    }
+
+    [Fact]
+    public async Task Execute_CustomJobShop_UsesALowerBoundCaption()
+    {
+        var queue = new JobQueue();
+        var replies = new FakeReplies();
+
+        await new BotCommandProcessor(queue)
+            .ProcessAsync("/solve jobshop\n2 2\n0 3 1 2\n1 4 0 2", 1, replies);
+
+        Assert.True(queue.Reader.TryRead(out var job));
+
+        await new JobExecutor().ExecuteAsync(job);
+
+        Assert.Equal(JobStatus.Completed, job.Status);
+        Assert.Equal("custom-gantt.png", replies.Pngs[0].FileName);
+        Assert.Contains("lower bound 6", replies.Pngs[0].Caption);
+    }
+
+    [Fact]
+    public async Task Execute_CustomTsp_UsesANearestNeighbourCaption()
+    {
+        var queue = new JobQueue();
+        var replies = new FakeReplies();
+
+        await new BotCommandProcessor(queue)
+            .ProcessAsync("/solve tsp\n0 0\n10 0\n10 10\n0 10\n5 5", 1, replies);
+
+        Assert.True(queue.Reader.TryRead(out var job));
+
+        await new JobExecutor().ExecuteAsync(job);
+
+        Assert.Equal(JobStatus.Completed, job.Status);
+        Assert.Equal("custom-route.png", replies.Pngs[0].FileName);
+        Assert.Contains("nearest neighbour", replies.Pngs[0].Caption);
+    }
+
     [Fact]
     public async Task Execute_JobCancelledWhileQueued_IsSkipped()
     {
@@ -72,8 +133,7 @@ public sealed class JobExecutorTests
         var queue = new JobQueue();
         var replies = new FakeReplies();
 
-        var job = Enqueue(
-            queue, replies, "ft10", JobShopSolverKind.GeneticAlgorithm);
+        var job = Enqueue(queue, replies, "ft10", SolverKind.GeneticAlgorithm);
 
         var running = Task.Run(() => new JobExecutor().ExecuteAsync(job));
 
@@ -96,8 +156,7 @@ public sealed class JobExecutorTests
         var queue = new JobQueue();
         var replies = new FakeReplies();
 
-        var job = Enqueue(
-            queue, replies, "ft10", JobShopSolverKind.GeneticAlgorithm);
+        var job = Enqueue(queue, replies, "ft10", SolverKind.GeneticAlgorithm);
 
         await new JobExecutor(TimeSpan.FromMilliseconds(50))
             .ExecuteAsync(job)

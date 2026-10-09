@@ -4,13 +4,7 @@ namespace Optinull.Application.Commands;
 
 public static class BotCommandParser
 {
-    public const string CustomBenchmark = "custom";
-
-    public const string Usage = "Usage: /solve <benchmark> [sa|ga]";
-
-    public const string CustomUsage =
-        "Usage: /solve custom [sa|ga], followed by the instance on the next lines " +
-        "(or attach it as a .txt file). Send /help to see the format.";
+    public const string Usage = "Usage: /solve <instance> [sa|ga]";
 
     public static BotCommand Parse(string? text)
     {
@@ -53,18 +47,18 @@ public static class BotCommandParser
         if (parts.Length < 2 || parts.Length > 3)
             return new InvalidCommand(Usage);
 
-        var solver = JobShopSolverKind.SimulatedAnnealing;
+        var solver = SolverKind.SimulatedAnnealing;
 
         if (parts.Length == 3)
         {
             switch (parts[2].ToLowerInvariant())
             {
                 case "sa":
-                    solver = JobShopSolverKind.SimulatedAnnealing;
+                    solver = SolverKind.SimulatedAnnealing;
                     break;
 
                 case "ga":
-                    solver = JobShopSolverKind.GeneticAlgorithm;
+                    solver = SolverKind.GeneticAlgorithm;
                     break;
 
                 default:
@@ -73,13 +67,9 @@ public static class BotCommandParser
             }
         }
 
-        var benchmark = parts[1].ToLowerInvariant();
-
-        if (benchmark != CustomBenchmark)
-            return new SolveCommand(benchmark, solver);
-
-        return string.IsNullOrWhiteSpace(body)
-            ? new InvalidCommand(CustomUsage)
-            : new SolveCommand(benchmark, solver, body);
+        return new SolveCommand(
+            parts[1].ToLowerInvariant(),
+            solver,
+            string.IsNullOrWhiteSpace(body) ? null : body);
     }
 }

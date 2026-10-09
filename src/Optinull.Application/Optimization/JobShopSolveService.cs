@@ -4,12 +4,6 @@ using Optinull.Problems.JobShop;
 
 namespace Optinull.Application.Optimization;
 
-public enum JobShopSolverKind
-{
-    SimulatedAnnealing,
-    GeneticAlgorithm
-}
-
 public sealed record JobShopSolveResult(
     string SolverName,
     JobShopSchedule Schedule,
@@ -24,7 +18,7 @@ public sealed class JobShopSolveService
 {
     public JobShopSolveResult Solve(
         JobShopProblem problem,
-        JobShopSolverKind kind = JobShopSolverKind.SimulatedAnnealing,
+        SolverKind kind = SolverKind.SimulatedAnnealing,
         int seed = 42,
         CancellationToken cancellationToken = default)
     {
@@ -37,7 +31,7 @@ public sealed class JobShopSolveService
 
         switch (kind)
         {
-            case JobShopSolverKind.SimulatedAnnealing:
+            case SolverKind.SimulatedAnnealing:
                 name = "Simulated Annealing";
                 search = new SimulatedAnnealing<JobSequence>(
                         iterationsPerTemperature: 90,
@@ -45,7 +39,7 @@ public sealed class JobShopSolveService
                     .Solve(new JobShopSearchProblem(problem), cancellationToken);
                 break;
 
-            case JobShopSolverKind.GeneticAlgorithm:
+            case SolverKind.GeneticAlgorithm:
                 name = "Genetic Algorithm";
                 search = JobShopGeneticAlgorithmPreset
                     .CreateSolver(random: random)

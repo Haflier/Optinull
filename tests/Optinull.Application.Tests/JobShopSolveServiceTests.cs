@@ -9,9 +9,9 @@ public sealed class JobShopSolveServiceTests
     private static readonly byte[] PngSignature = [0x89, 0x50, 0x4E, 0x47];
 
     [Theory]
-    [InlineData(JobShopSolverKind.SimulatedAnnealing)]
-    [InlineData(JobShopSolverKind.GeneticAlgorithm)]
-    public void Solve_Ft06_ReturnsConsistentSchedule(JobShopSolverKind kind)
+    [InlineData(SolverKind.SimulatedAnnealing)]
+    [InlineData(SolverKind.GeneticAlgorithm)]
+    public void Solve_Ft06_ReturnsConsistentSchedule(SolverKind kind)
     {
         var problem = JobShopBenchmarkInstances.Ft06();
 

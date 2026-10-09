@@ -7,12 +7,12 @@ public abstract record BotCommand;
 public sealed record HelpCommand : BotCommand;
 
 /// <summary>
-/// Solve a built-in benchmark, or "custom" with the instance text that
-/// followed the command.
+/// Target is a built-in instance name (ft06, circle20, ...) or a problem id
+/// (jobshop, tsp) when the instance text follows the command.
 /// </summary>
 public sealed record SolveCommand(
-    string Benchmark,
-    JobShopSolverKind Solver,
+    string Target,
+    SolverKind Solver,
     string? InstanceText = null) : BotCommand;
 
 public sealed record CancelCommand : BotCommand;

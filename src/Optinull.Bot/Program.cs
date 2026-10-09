@@ -1,5 +1,7 @@
 using Optinull.Application.Commands;
 using Optinull.Application.Jobs;
+using Optinull.Application.Problems;
+using Optinull.Application.Problems;
 using Optinull.Bot;
 using Optinull.Infrastructure.Telegram;
 
@@ -15,6 +17,8 @@ if (string.IsNullOrWhiteSpace(token))
 }
 
 builder.Services.AddSingleton(new TelegramBotOptions(token));
+builder.Services.AddSingleton(ProblemRegistry.CreateDefault());
+builder.Services.AddSingleton(ProblemRegistry.CreateDefault());
 builder.Services.AddSingleton(new JobQueue());
 builder.Services.AddSingleton(new JobExecutor());
 builder.Services.AddSingleton<BotCommandProcessor>();

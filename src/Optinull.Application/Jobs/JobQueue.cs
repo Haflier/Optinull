@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 using Optinull.Application.Commands;
-using Optinull.Problems.JobShop;
+using Optinull.Application.Problems;
 
 namespace Optinull.Application.Jobs;
 
@@ -45,7 +45,7 @@ public sealed class JobQueue
         long chatId,
         SolveCommand command,
         IBotReplies replies,
-        JobShopProblem? customProblem = null)
+        IProblemInstance instance)
     {
         lock (_gate)
         {
@@ -55,7 +55,7 @@ public sealed class JobQueue
                 return new AlreadyActive(existing);
             }
 
-            var job = new OptimizationJob(_lastId + 1, chatId, command, replies, customProblem);
+            var job = new OptimizationJob(_lastId + 1, chatId, command, replies, instance);
 
             if (!_channel.Writer.TryWrite(job))
                 return new QueueFull();
