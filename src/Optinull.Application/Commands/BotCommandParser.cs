@@ -4,12 +4,26 @@ namespace Optinull.Application.Commands;
 
 public static class BotCommandParser
 {
+    public const string CustomBenchmark = "custom";
+
     public const string Usage = "Usage: /solve <benchmark> [sa|ga]";
+
+    public const string CustomUsage =
+        "Usage: /solve custom [sa|ga], followed by the instance on the next lines " +
+        "(or attach it as a .txt file). Send /help to see the format.";
 
     public static BotCommand Parse(string? text)
     {
-        var parts = (text ?? string.Empty)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var input = (text ?? string.Empty).Replace("\r", string.Empty);
+
+        // The first line is the command; anything after it is the instance.
+        var newline = input.IndexOf('\n');
+        var header = newline < 0 ? input : input[..newline];
+        var body = newline < 0 ? null : input[(newline + 1)..];
+
+        var parts = header.Split(
+            ' ',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         if (parts.Length == 0 || !parts[0].StartsWith('/'))
             return new InvalidCommand("Send /help to see what I can do.");
@@ -24,7 +38,7 @@ public static class BotCommandParser
                 return new HelpCommand();
 
             case "/solve":
-                return ParseSolve(parts);
+                return ParseSolve(parts, body);
 
             case "/cancel":
                 return new CancelCommand();
@@ -34,7 +48,7 @@ public static class BotCommandParser
         }
     }
 
-    private static BotCommand ParseSolve(string[] parts)
+    private static BotCommand ParseSolve(string[] parts, string? body)
     {
         if (parts.Length < 2 || parts.Length > 3)
             return new InvalidCommand(Usage);
@@ -59,6 +73,13 @@ public static class BotCommandParser
             }
         }
 
-        return new SolveCommand(parts[1].ToLowerInvariant(), solver);
+        var benchmark = parts[1].ToLowerInvariant();
+
+        if (benchmark != CustomBenchmark)
+            return new SolveCommand(benchmark, solver);
+
+        return string.IsNullOrWhiteSpace(body)
+            ? new InvalidCommand(CustomUsage)
+            : new SolveCommand(benchmark, solver, body);
     }
 }

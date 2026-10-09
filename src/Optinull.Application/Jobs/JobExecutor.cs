@@ -1,5 +1,6 @@
 using Optinull.Application.Optimization;
 using Optinull.Application.Reporting;
+using Optinull.Problems.JobShop;
 using Optinull.Problems.JobShop.Benchmarks;
 
 namespace Optinull.Application.Jobs;
@@ -43,7 +44,7 @@ public sealed class JobExecutor
 
         try
         {
-            if (!JobShopBenchmarkCatalog.TryGet(job.Command.Benchmark, out var benchmark))
+            if (Resolve(job) is not { } target)
             {
                 job.Fail($"Unknown benchmark '{job.Command.Benchmark}'.");
                 await TrySendAsync(job, $"Job #{job.Id} failed: unknown benchmark.");
@@ -51,35 +52,35 @@ public sealed class JobExecutor
             }
 
             await job.Replies.SendTextAsync(
-                $"Solving job #{job.Id}: {benchmark.Name} ({job.Command.Solver})...",
+                $"Solving job #{job.Id}: {target.Name} ({job.Command.Solver})...",
                 token);
 
             var (result, report) = await Task.Run(
                 () =>
                 {
                     var solved = _solver.Solve(
-                        benchmark.Problem,
+                        target.Problem,
                         job.Command.Solver,
                         cancellationToken: token);
 
-                    return (solved, _reports.Render(benchmark.Problem, solved));
+                    return (solved, _reports.Render(target.Problem, solved));
                 },
                 token);
 
             // A solver that ignores the token still must not send a cancelled job's result.
             token.ThrowIfCancellationRequested();
 
-            var gap = (result.Makespan - benchmark.KnownOptimum) / benchmark.KnownOptimum;
-
-            var caption =
-                $"{benchmark.Name} | {result.SolverName} | makespan {result.Makespan:0} " +
-                $"(optimal {benchmark.KnownOptimum:0}, gap {gap:P1})";
+            await job.Replies.SendPngAsync(
+                report.GanttPng,
+                $"{target.Name}-gantt.png",
+                Caption(target, result),
+                token);
 
             await job.Replies.SendPngAsync(
-                report.GanttPng, $"{benchmark.Name}-gantt.png", caption, token);
-
-            await job.Replies.SendPngAsync(
-                report.ConvergencePng, $"{benchmark.Name}-convergence.png", "Convergence", token);
+                report.ConvergencePng,
+                $"{target.Name}-convergence.png",
+                "Convergence",
+                token);
 
             job.Complete();
         }
@@ -108,6 +109,36 @@ public sealed class JobExecutor
             job.Fail(exception.Message);
             await TrySendAsync(job, $"Job #{job.Id} failed. Please try again.");
         }
+    }
+
+    private sealed record Target(string Name, JobShopProblem Problem, double? KnownOptimum);
+
+    private static Target? Resolve(OptimizationJob job)
+    {
+        if (job.CustomProblem is { } custom)
+            return new Target("custom", custom, null);
+
+        return JobShopBenchmarkCatalog.TryGet(job.Command.Benchmark, out var benchmark)
+            ? new Target(benchmark.Name, benchmark.Problem, benchmark.KnownOptimum)
+            : null;
+    }
+
+    private static string Caption(Target target, JobShopSolveResult result)
+    {
+        var prefix = $"{target.Name} | {result.SolverName} | makespan {result.Makespan:0}";
+
+        if (target.KnownOptimum is { } optimum)
+        {
+            var gap = (result.Makespan - optimum) / optimum;
+
+            return $"{prefix} (optimal {optimum:0}, gap {gap:P1})";
+        }
+
+        // The optimum of a custom problem is unknown, so compare with a lower bound.
+        var lowerBound = JobShopLowerBound.Compute(target.Problem);
+        var above = (result.Makespan - lowerBound) / lowerBound;
+
+        return $"{prefix} (lower bound {lowerBound:0}, at most {above:P1} above optimal)";
     }
 
     private static async Task TrySendAsync(OptimizationJob job, string text)

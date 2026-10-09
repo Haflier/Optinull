@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using Optinull.Application.Commands;
+using Optinull.Problems.JobShop;
 
 namespace Optinull.Application.Jobs;
 
@@ -43,7 +44,8 @@ public sealed class JobQueue
     public EnqueueResult TryEnqueue(
         long chatId,
         SolveCommand command,
-        IBotReplies replies)
+        IBotReplies replies,
+        JobShopProblem? customProblem = null)
     {
         lock (_gate)
         {
@@ -53,7 +55,7 @@ public sealed class JobQueue
                 return new AlreadyActive(existing);
             }
 
-            var job = new OptimizationJob(_lastId + 1, chatId, command, replies);
+            var job = new OptimizationJob(_lastId + 1, chatId, command, replies, customProblem);
 
             if (!_channel.Writer.TryWrite(job))
                 return new QueueFull();

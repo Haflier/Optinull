@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Optinull.Application.Commands;
 using Telegram.Bot;
@@ -8,9 +9,11 @@ namespace Optinull.Infrastructure.Telegram;
 
 public sealed record TelegramBotOptions(string Token);
 
-/// <summary>Long-polls Telegram and hands text messages to the command processor.</summary>
+/// <summary>Long-polls Telegram and hands messages to the command processor.</summary>
 public sealed class TelegramPoller
 {
+    private const int MaxDocumentBytes = 30_000;
+
     private readonly TelegramBotClient _client;
     private readonly BotCommandProcessor _processor;
     private readonly ILogger<TelegramPoller> _logger;
@@ -48,8 +51,8 @@ public sealed class TelegramPoller
                 {
                     offset = update.Id + 1;
 
-                    if (update.Message is { Text: { } text } message)
-                        _ = HandleAsync(message.Chat.Id, text, cancellationToken);
+                    if (update.Message is { } message)
+                        _ = HandleAsync(message, cancellationToken);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -72,12 +75,21 @@ public sealed class TelegramPoller
         }
     }
 
-    private async Task HandleAsync(long chatId, string text, CancellationToken cancellationToken)
+    private async Task HandleAsync(Message message, CancellationToken cancellationToken)
     {
+        var chatId = message.Chat.Id;
         var replies = new TelegramReplies(_client, chatId);
 
         try
         {
+            var text = message.Text;
+
+            if (text is null && message.Document is { } document)
+                text = await ReadDocumentCommandAsync(message, document, replies, cancellationToken);
+
+            if (text is null)
+                return;
+
             await _processor.ProcessAsync(text, chatId, replies, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -98,5 +110,33 @@ public sealed class TelegramPoller
                 _logger.LogError(replyException, "Failed to send the error reply.");
             }
         }
+    }
+
+    // A .txt file whose caption is a command, e.g. "/solve custom ga": the file
+    // content becomes the lines after the command.
+    private async Task<string?> ReadDocumentCommandAsync(
+        Message message,
+        Document document,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        var caption = message.Caption ?? string.Empty;
+
+        if (!caption.TrimStart().StartsWith('/'))
+            return null;
+
+        if (document.FileSize is > MaxDocumentBytes)
+        {
+            await replies.SendTextAsync(
+                $"That file is too large (limit {MaxDocumentBytes / 1000} KB).",
+                cancellationToken);
+            return null;
+        }
+
+        using var stream = new MemoryStream();
+
+        await _client.GetInfoAndDownloadFile(document.FileId, stream, cancellationToken);
+
+        return caption.TrimEnd() + "\n" + Encoding.UTF8.GetString(stream.ToArray());
     }
 }

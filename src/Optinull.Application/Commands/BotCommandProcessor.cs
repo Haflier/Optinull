@@ -1,5 +1,7 @@
 using Optinull.Application.Jobs;
+using Optinull.Problems.JobShop;
 using Optinull.Problems.JobShop.Benchmarks;
+using Optinull.Problems.JobShop.Parsing;
 
 namespace Optinull.Application.Commands;
 
@@ -15,14 +17,28 @@ public sealed class BotCommandProcessor
         _queue = queue;
     }
 
-    public static string HelpText =>
-        "I solve job shop scheduling problems and send back a Gantt chart " +
-        "and a convergence chart.\n\n" +
-        "/solve <benchmark> [sa|ga]\n" +
-        $"Benchmarks: {string.Join(", ", JobShopBenchmarkCatalog.Names)}\n" +
-        "sa = simulated annealing (default), ga = genetic algorithm\n\n" +
-        "/cancel - stop your current job\n\n" +
-        "Example: /solve ft10";
+    public static string HelpText
+    {
+        get
+        {
+            var limits = JobShopInputLimits.Default;
+
+            return
+                "I solve job shop scheduling problems and send back a Gantt chart " +
+                "and a convergence chart.\n\n" +
+                "/solve <benchmark> [sa|ga]\n" +
+                $"Benchmarks: {string.Join(", ", JobShopBenchmarkCatalog.Names)}\n" +
+                "sa = simulated annealing (default), ga = genetic algorithm\n\n" +
+                "Your own problem: send /solve custom [sa|ga] with the instance on the " +
+                "next lines, or attach a .txt file with /solve custom as the caption.\n" +
+                "First line: jobs and machines. Then one line per job with " +
+                "'machine time' pairs, machines numbered from 0. Example:\n" +
+                "/solve custom\n3 3\n0 3 1 2 2 2\n0 2 2 1 1 4\n1 4 2 3 0 1\n" +
+                $"Limits: {limits.MaxJobs} jobs, {limits.MaxMachines} machines, " +
+                $"{limits.MaxOperations} operations.\n\n" +
+                "/cancel - stop your current job";
+        }
+    }
 
     public async Task ProcessAsync(
         string text,
@@ -58,19 +74,42 @@ public sealed class BotCommandProcessor
         IBotReplies replies,
         CancellationToken cancellationToken)
     {
-        if (!JobShopBenchmarkCatalog.TryGet(command.Benchmark, out _))
+        JobShopProblem? custom = null;
+        var queued = command;
+        var label = command.Benchmark;
+
+        if (command.Benchmark == BotCommandParser.CustomBenchmark)
+        {
+            if (!JobShopTextParser.TryParse(
+                    command.InstanceText,
+                    JobShopInputLimits.Default,
+                    out custom,
+                    out var error))
+            {
+                await replies.SendTextAsync(
+                    $"Invalid instance: {error}\n\nSend /help to see the format.",
+                    cancellationToken);
+                return;
+            }
+
+            // The parsed problem travels with the job; drop the raw text.
+            queued = command with { InstanceText = null };
+            label = $"custom, {custom!.Jobs.Count} jobs x {custom.MachineCount} machines";
+        }
+        else if (!JobShopBenchmarkCatalog.TryGet(command.Benchmark, out _))
         {
             await replies.SendTextAsync(
                 $"Unknown benchmark '{command.Benchmark}'. " +
-                $"Available: {string.Join(", ", JobShopBenchmarkCatalog.Names)}.",
+                $"Available: {string.Join(", ", JobShopBenchmarkCatalog.Names)}, " +
+                $"or {BotCommandParser.CustomBenchmark} for your own problem.",
                 cancellationToken);
             return;
         }
 
-        var message = _queue.TryEnqueue(chatId, command, replies) switch
+        var message = _queue.TryEnqueue(chatId, queued, replies, custom) switch
         {
             Enqueued enqueued =>
-                $"Queued job #{enqueued.Job.Id} ({command.Benchmark}, {command.Solver}). " +
+                $"Queued job #{enqueued.Job.Id} ({label}, {command.Solver}). " +
                 "I'll send the charts when it's done. Send /cancel to stop it.",
 
             AlreadyActive active =>
