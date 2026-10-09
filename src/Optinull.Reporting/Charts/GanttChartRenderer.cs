@@ -59,6 +59,23 @@ public sealed class GanttChartRenderer
         plot.Title(title);
         plot.XLabel("Time");
 
+        plot.FigureBackground.Color = ScottPlot.Color.FromHex("#0747af");
+        plot.DataBackground.Color = ScottPlot.Color.FromHex("#c0c08a");
+
+        plot.Axes.Color(
+            ScottPlot.Color.FromHex("#ffffff"));
+
+        plot.Axes.Left.TickLabelStyle.ForeColor =
+            ScottPlot.Color.FromHex("#ffffff");
+        plot.Axes.Bottom.TickLabelStyle.ForeColor =
+            ScottPlot.Color.FromHex("#ffffff");
+
+        plot.Grid.MajorLineColor =
+            ScottPlot.Color.FromHex("#1f74b5");
+
+        plot.Grid.MinorLineColor =
+            ScottPlot.Color.FromHex("#1f74b5");
+
         var height = Math.Max(400, 140 + rowLabels.Count * 55);
 
         return plot.GetImageBytes(width, height, ScottPlot.ImageFormat.Png);
