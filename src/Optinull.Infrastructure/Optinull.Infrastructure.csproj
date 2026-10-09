@@ -3,6 +3,12 @@
   <ItemGroup>
     <ProjectReference Include="..\Optinull.Application\Optinull.Application.csproj" />
     <ProjectReference Include="..\Optinull.Domain\Optinull.Domain.csproj" />
+    <ProjectReference Include="..\Optinull.Problems\Optinull.Problems.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Telegram.Bot" Version="22.10.3.3" />
   </ItemGroup>
 
   <PropertyGroup>
