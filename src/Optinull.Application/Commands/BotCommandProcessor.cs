@@ -1,16 +1,19 @@
-using Optinull.Application.Optimization;
-using Optinull.Application.Reporting;
+using Optinull.Application.Jobs;
 using Optinull.Problems.JobShop.Benchmarks;
 
 namespace Optinull.Application.Commands;
 
+/// <summary>Understands chat commands; solving itself happens on the job queue.</summary>
 public sealed class BotCommandProcessor
 {
-    private const int MaxConcurrentSolves = 2;
+    private readonly JobQueue _queue;
 
-    private readonly SemaphoreSlim _slots = new(MaxConcurrentSolves);
-    private readonly JobShopSolveService _solver = new();
-    private readonly JobShopReportService _reports = new();
+    public BotCommandProcessor(JobQueue queue)
+    {
+        ArgumentNullException.ThrowIfNull(queue);
+
+        _queue = queue;
+    }
 
     public static string HelpText =>
         "I solve job shop scheduling problems and send back a Gantt chart " +
@@ -18,10 +21,12 @@ public sealed class BotCommandProcessor
         "/solve <benchmark> [sa|ga]\n" +
         $"Benchmarks: {string.Join(", ", JobShopBenchmarkCatalog.Names)}\n" +
         "sa = simulated annealing (default), ga = genetic algorithm\n\n" +
+        "/cancel - stop your current job\n\n" +
         "Example: /solve ft10";
 
     public async Task ProcessAsync(
         string text,
+        long chatId,
         IBotReplies replies,
         CancellationToken cancellationToken = default)
     {
@@ -38,17 +43,22 @@ public sealed class BotCommandProcessor
                 break;
 
             case SolveCommand solve:
-                await SolveAsync(solve, replies, cancellationToken);
+                await EnqueueAsync(solve, chatId, replies, cancellationToken);
+                break;
+
+            case CancelCommand:
+                await CancelAsync(chatId, replies, cancellationToken);
                 break;
         }
     }
 
-    private async Task SolveAsync(
+    private async Task EnqueueAsync(
         SolveCommand command,
+        long chatId,
         IBotReplies replies,
         CancellationToken cancellationToken)
     {
-        if (!JobShopBenchmarkCatalog.TryGet(command.Benchmark, out var benchmark))
+        if (!JobShopBenchmarkCatalog.TryGet(command.Benchmark, out _))
         {
             await replies.SendTextAsync(
                 $"Unknown benchmark '{command.Benchmark}'. " +
@@ -57,47 +67,36 @@ public sealed class BotCommandProcessor
             return;
         }
 
-        if (!await _slots.WaitAsync(0, cancellationToken))
+        var message = _queue.TryEnqueue(chatId, command, replies) switch
         {
-            await replies.SendTextAsync(
-                "I'm busy with other requests. Please try again in a moment.",
-                cancellationToken);
-            return;
-        }
+            Enqueued enqueued =>
+                $"Queued job #{enqueued.Job.Id} ({command.Benchmark}, {command.Solver}). " +
+                "I'll send the charts when it's done. Send /cancel to stop it.",
 
-        try
+            AlreadyActive active =>
+                $"You already have job #{active.Existing.Id} in progress. " +
+                "Wait for it, or send /cancel.",
+
+            _ => "The queue is full. Please try again in a moment."
+        };
+
+        await replies.SendTextAsync(message, cancellationToken);
+    }
+
+    private async Task CancelAsync(
+        long chatId,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        var result = _queue.Cancel(chatId);
+
+        var message = result switch
         {
-            await replies.SendTextAsync(
-                $"Solving {benchmark.Name} ({command.Solver})...",
-                cancellationToken);
+            null => "You have no job in progress.",
+            { WasRunning: true } => $"Cancelling job #{result.Job.Id}...",
+            _ => $"Job #{result.Job.Id} cancelled."
+        };
 
-            var (result, report) = await Task.Run(
-                () =>
-                {
-                    var solved = _solver.Solve(
-                        benchmark.Problem,
-                        command.Solver,
-                        cancellationToken: cancellationToken);
-
-                    return (solved, _reports.Render(benchmark.Problem, solved));
-                },
-                cancellationToken);
-
-            var gap = (result.Makespan - benchmark.KnownOptimum) / benchmark.KnownOptimum;
-
-            var caption =
-                $"{benchmark.Name} | {result.SolverName} | makespan {result.Makespan:0} " +
-                $"(optimal {benchmark.KnownOptimum:0}, gap {gap:P1})";
-
-            await replies.SendPngAsync(
-                report.GanttPng, $"{benchmark.Name}-gantt.png", caption, cancellationToken);
-
-            await replies.SendPngAsync(
-                report.ConvergencePng, $"{benchmark.Name}-convergence.png", "Convergence", cancellationToken);
-        }
-        finally
-        {
-            _slots.Release();
-        }
+        await replies.SendTextAsync(message, cancellationToken);
     }
 }

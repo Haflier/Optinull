@@ -40,4 +40,11 @@ public sealed class BotCommandParserTests
     [InlineData(null)]
     public void BadInput_ParsesAsInvalid(string? text) =>
         Assert.IsType<InvalidCommand>(BotCommandParser.Parse(text));
+
+    [Theory]
+    [InlineData("/cancel")]
+    [InlineData("/CANCEL")]
+    [InlineData("/cancel@OptinullBot")]
+    public void Cancel_ParsesAsCancel(string text) =>
+        Assert.IsType<CancelCommand>(BotCommandParser.Parse(text));
 }

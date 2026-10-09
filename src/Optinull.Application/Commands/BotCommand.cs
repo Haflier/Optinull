@@ -11,3 +11,5 @@ public sealed record SolveCommand(
     JobShopSolverKind Solver) : BotCommand;
 
 public sealed record InvalidCommand(string Message) : BotCommand;
+
+public sealed record CancelCommand : BotCommand;

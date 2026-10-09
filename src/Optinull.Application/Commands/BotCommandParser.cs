@@ -26,6 +26,9 @@ public static class BotCommandParser
             case "/solve":
                 return ParseSolve(parts);
 
+            case "/cancel":
+                return new CancelCommand();
+
             default:
                 return new InvalidCommand("Unknown command. Send /help to see what I can do.");
         }

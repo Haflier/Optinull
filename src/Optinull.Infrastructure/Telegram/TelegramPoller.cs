@@ -78,7 +78,7 @@ public sealed class TelegramPoller
 
         try
         {
-            await _processor.ProcessAsync(text, replies, cancellationToken);
+            await _processor.ProcessAsync(text, chatId, replies, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
