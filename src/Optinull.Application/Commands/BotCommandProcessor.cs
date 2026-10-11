@@ -25,18 +25,25 @@ public sealed class BotCommandProcessor
         {
             var text = new StringBuilder();
 
-            text.AppendLine("I solve optimization problems and send back charts.");
+            text.AppendLine("Welcome to Optinull.");
+            text.AppendLine("Optimization engine for solving and comparing optimization problems.");
             text.AppendLine();
-            text.AppendLine("/solve <problem> [sa|ga] [iterations=N] [seed=N] [key=value ...]");
-            text.AppendLine($"Built-in instances: {string.Join(", ", _registry.BuiltInNames)}");
-            text.AppendLine("sa = simulated annealing (default), ga = genetic algorithm");
+            text.AppendLine("/optimize - pick a problem, a dataset and an algorithm with buttons");
+            text.AppendLine("/compare <problem> - run every algorithm on the same problem");
+            text.AppendLine();
             text.AppendLine(
-                $"iterations = candidate solutions to evaluate, " +
+                "/solve <problem> [greedy|hc|sa|ga|all] [iterations=N] [seed=N] [key=value ...]");
+            text.AppendLine($"Built-in instances: {string.Join(", ", _registry.BuiltInNames)}");
+            text.AppendLine(
+                "greedy = fast heuristic, hc = hill climbing, sa = simulated annealing (default), " +
+                "ga = genetic algorithm, all = compare them");
+            text.AppendLine(
+                $"iterations = candidate solutions sa and ga may evaluate, " +
                 $"{SolveLimits.MinIterations}-{SolveLimits.MaxIterations} (default: solver's own)");
             text.AppendLine("seed = same seed, same result");
             text.AppendLine();
             text.AppendLine(
-                "Your own problem: /solve <problem> [sa|ga] with the instance on the " +
+                "Your own problem: /solve <problem> [solver] with the instance on the " +
                 "next lines, or attach a .txt file with that as the caption.");
             text.AppendLine("Or a random one: give the problem's settings instead of lines.");
 
@@ -71,6 +78,10 @@ public sealed class BotCommandProcessor
 
             case InvalidCommand invalid:
                 await replies.SendTextAsync(invalid.Message, cancellationToken);
+                break;
+
+            case OptimizeCommand:
+                await ShowProblemsAsync(replies, cancellationToken);
                 break;
 
             case SolveCommand solve:
@@ -146,7 +157,7 @@ public sealed class BotCommandProcessor
             {
                 await replies.SendTextAsync(
                     $"{command.Target} is a fixed instance, so it takes no settings " +
-                    $"({string.Join(", ", settings.Keys)}). Only sa|ga, iterations= and seed= apply.",
+                    $"({string.Join(", ", settings.Keys)}). Only the solver, iterations= and seed= apply.",
                     cancellationToken);
                 return;
             }
@@ -167,7 +178,8 @@ public sealed class BotCommandProcessor
         var message = _queue.TryEnqueue(chatId, queued, replies, instance!) switch
         {
             Enqueued enqueued =>
-                $"Queued job #{enqueued.Job.Id} ({instance!.Description}, {command.Solver}" +
+                $"Queued job #{enqueued.Job.Id} ({instance!.Description}, " +
+                $"{(command.CompareAll ? "all solvers" : SolverNames.Display(command.Solver))}" +
                 $"{(command.Iterations is { } n ? $", {n} iterations" : string.Empty)}). " +
                 "I'll send the charts when it's done. Send /cancel to stop it.",
 
@@ -179,6 +191,161 @@ public sealed class BotCommandProcessor
         };
 
         await replies.SendTextAsync(message, cancellationToken);
+    }
+
+    // ---- The /optimize wizard ------------------------------------------------
+    // Every button carries the whole choice so far ("o:tsp:small:ga"), so the
+    // wizard needs no state on the server.
+
+    private static readonly (string Key, string Label)[] Algorithms =
+    [
+        ("greedy", "Greedy"),
+        ("hc", "Hill Climbing"),
+        ("sa", "Simulated Annealing"),
+        ("ga", "Genetic Algorithm"),
+        ("all", "Compare All")
+    ];
+
+    private static IReadOnlyList<Choice> Button(string label, string data) =>
+        [new Choice(label, data)];
+
+    private static string Capitalize(string text) =>
+        text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+
+    private Task ShowProblemsAsync(IBotReplies replies, CancellationToken cancellationToken) =>
+        replies.ShowChoicesAsync(
+            "Choose a problem:",
+            _registry.Modules
+                .Select(module => Button(Capitalize(module.Title), $"o:{module.Id}"))
+                .ToList(),
+            cancellationToken);
+
+    /// <summary>Handles a button press from the /optimize wizard.</summary>
+    public async Task ProcessCallbackAsync(
+        string? data,
+        long chatId,
+        IBotReplies replies,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(replies);
+
+        var parts = (data ?? string.Empty).Split(':');
+
+        if (parts.Length < 2 || parts.Length > 4 || parts[0] != "o")
+            return;
+
+        var module = _registry.FindModule(parts[1]);
+
+        if (module is null)
+        {
+            await SendStaleAsync(replies, cancellationToken);
+            return;
+        }
+
+        switch (parts.Length)
+        {
+            case 2:
+                await ShowDatasetsAsync(module, replies, cancellationToken);
+                break;
+
+            case 3 when parts[2] == "custom":
+                await replies.SendTextAsync(
+                    $"Send your own {module.Title} data as /solve {module.Id} [greedy|hc|sa|ga|all] " +
+                    "followed by the instance on the next lines, or attach a .txt file " +
+                    $"with that caption.\n\n{module.CustomInputHelp}",
+                    cancellationToken);
+                break;
+
+            case 3 when module.Presets.Any(preset => preset.Key == parts[2]):
+                await ShowAlgorithmsAsync(module, parts[2], replies, cancellationToken);
+                break;
+
+            case 4:
+                await StartFromWizardAsync(module, parts[2], parts[3], chatId, replies, cancellationToken);
+                break;
+
+            default:
+                await SendStaleAsync(replies, cancellationToken);
+                break;
+        }
+    }
+
+    private static Task SendStaleAsync(IBotReplies replies, CancellationToken cancellationToken) =>
+        replies.SendTextAsync(
+            "That menu is out of date. Send /optimize to start again.",
+            cancellationToken);
+
+    private Task ShowDatasetsAsync(
+        IProblemModule module,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        var rows = module.Presets
+            .Select(preset => Button(preset.Label, $"o:{module.Id}:{preset.Key}"))
+            .Append(Button("Custom", $"o:{module.Id}:custom"))
+            .ToList();
+
+        return replies.ShowChoicesAsync(
+            $"{Capitalize(module.Title)}\nChoose dataset:",
+            rows,
+            cancellationToken);
+    }
+
+    private Task ShowAlgorithmsAsync(
+        IProblemModule module,
+        string presetKey,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        var preset = module.Presets.First(candidate => candidate.Key == presetKey);
+
+        var rows = Algorithms
+            .Select(algorithm => Button(algorithm.Label, $"o:{module.Id}:{presetKey}:{algorithm.Key}"))
+            .ToList();
+
+        return replies.ShowChoicesAsync(
+            $"{Capitalize(module.Title)}: {preset.Label}\nChoose algorithm:",
+            rows,
+            cancellationToken);
+    }
+
+    private async Task StartFromWizardAsync(
+        IProblemModule module,
+        string presetKey,
+        string algorithmKey,
+        long chatId,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        var preset = module.Presets.FirstOrDefault(candidate => candidate.Key == presetKey);
+        var algorithm = Algorithms.FirstOrDefault(candidate => candidate.Key == algorithmKey);
+
+        if (preset is null || algorithm.Key is null)
+        {
+            await SendStaleAsync(replies, cancellationToken);
+            return;
+        }
+
+        var (solver, compare) = algorithm.Key switch
+        {
+            "greedy" => (SolverKind.Greedy, false),
+            "hc" => (SolverKind.HillClimbing, false),
+            "ga" => (SolverKind.GeneticAlgorithm, false),
+            "all" => (SolverKind.SimulatedAnnealing, true),
+            _ => (SolverKind.SimulatedAnnealing, false)
+        };
+
+        // Replace the buttons with what was chosen, then start like /solve does.
+        await replies.ShowChoicesAsync(
+            $"Problem: {Capitalize(module.Title)}\nDataset: {preset.Label}\nAlgorithm: {algorithm.Label}",
+            [],
+            cancellationToken);
+
+        await EnqueueAsync(
+            new SolveCommand(preset.Target, solver, null, null, null, preset.Settings, compare),
+            chatId,
+            replies,
+            cancellationToken);
     }
 
     private async Task CancelAsync(

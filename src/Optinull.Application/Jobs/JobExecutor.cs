@@ -1,4 +1,7 @@
+using Optinull.Application.Commands;
+using Optinull.Application.Comparison;
 using Optinull.Application.Optimization;
+using Optinull.Application.Problems;
 
 namespace Optinull.Application.Jobs;
 
@@ -40,19 +43,24 @@ public sealed class JobExecutor
         try
         {
             await job.Replies.SendTextAsync(
-                $"Solving job #{job.Id}: {job.Instance.Description} ({job.Command.Solver})...",
+                $"Solving job #{job.Id}: {job.Instance.Description} ({Describe(job)})...",
                 token);
+
+            var progress = new ReplyProgress(job.Replies, $"Job #{job.Id}: {Describe(job)}", token);
 
             var options = new SolveOptions(
                 job.Command.Seed ?? SolveOptions.DefaultSeed,
-                job.Command.Iterations);
+                job.Command.Iterations,
+                progress);
 
             var report = await Task.Run(
-                () => job.Instance.Solve(job.Command.Solver, options, token),
+                () => Solve(job, options, token),
                 token);
 
             // A solver that ignores the token still must not send a cancelled job's result.
             token.ThrowIfCancellationRequested();
+
+            await progress.FinishAsync();
 
             foreach (var image in report.Images)
             {
@@ -62,6 +70,9 @@ public sealed class JobExecutor
                     image.Caption,
                     token);
             }
+
+            if (report.Summary is not null)
+                await job.Replies.SendTextAsync(report.Summary, token);
 
             job.Complete();
         }
@@ -92,6 +103,14 @@ public sealed class JobExecutor
         }
     }
 
+    private static string Describe(OptimizationJob job) =>
+        job.Command.CompareAll ? "all solvers" : SolverNames.Display(job.Command.Solver);
+
+    private static SolveReport Solve(OptimizationJob job, SolveOptions options, CancellationToken token) =>
+        job.Command.CompareAll
+            ? new SolverComparisonService().Compare(job.Instance, options, token)
+            : job.Instance.Solve(job.Command.Solver, options, token);
+
     private static async Task TrySendAsync(OptimizationJob job, string text)
     {
         try
@@ -101,6 +120,46 @@ public sealed class JobExecutor
         catch
         {
             // The chat may be unreachable; the job outcome is already recorded.
+        }
+    }
+
+    /// <summary>Forwards solver progress to the chat without ever failing the job.</summary>
+    private sealed class ReplyProgress : IProgress<double>
+    {
+        private readonly IBotReplies _replies;
+        private readonly string _label;
+        private readonly CancellationToken _token;
+
+        private int _reported;
+
+        public ReplyProgress(IBotReplies replies, string label, CancellationToken token)
+        {
+            _replies = replies;
+            _label = label;
+            _token = token;
+        }
+
+        public void Report(double value)
+        {
+            Volatile.Write(ref _reported, 1);
+
+            _ = SendAsync(value);
+        }
+
+        /// <summary>Shows 100%, but only if a bar was shown at all.</summary>
+        public Task FinishAsync() =>
+            Volatile.Read(ref _reported) == 1 ? SendAsync(1.0) : Task.CompletedTask;
+
+        private async Task SendAsync(double value)
+        {
+            try
+            {
+                await _replies.ReportProgressAsync(value, _label, _token);
+            }
+            catch
+            {
+                // A progress bar is never worth failing a job.
+            }
         }
     }
 }

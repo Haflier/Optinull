@@ -44,7 +44,7 @@ public sealed class TelegramPoller
                 var updates = await _client.GetUpdates(
                     offset,
                     timeout: 30,
-                    allowedUpdates: [UpdateType.Message],
+                    allowedUpdates: [UpdateType.Message, UpdateType.CallbackQuery],
                     cancellationToken: cancellationToken);
 
                 foreach (var update in updates)
@@ -53,6 +53,8 @@ public sealed class TelegramPoller
 
                     if (update.Message is { } message)
                         _ = HandleAsync(message, cancellationToken);
+                    else if (update.CallbackQuery is { } callback)
+                        _ = HandleCallbackAsync(callback, cancellationToken);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -98,6 +100,46 @@ public sealed class TelegramPoller
         catch (Exception exception)
         {
             _logger.LogError(exception, "Failed to handle a message.");
+
+            try
+            {
+                await replies.SendTextAsync(
+                    "Something went wrong while handling that request.",
+                    CancellationToken.None);
+            }
+            catch (Exception replyException)
+            {
+                _logger.LogError(replyException, "Failed to send the error reply.");
+            }
+        }
+    }
+
+    // A button of the /optimize wizard was pressed.
+    private async Task HandleCallbackAsync(CallbackQuery callback, CancellationToken cancellationToken)
+    {
+        // Stops the spinner on the button; failing to do so is harmless.
+        try
+        {
+            await _client.AnswerCallbackQuery(callback.Id, cancellationToken: cancellationToken);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogDebug(exception, "Could not answer a callback query.");
+        }
+
+        var chatId = callback.Message?.Chat.Id ?? callback.From.Id;
+        var replies = new TelegramReplies(_client, chatId, callback.Message?.MessageId);
+
+        try
+        {
+            await _processor.ProcessCallbackAsync(callback.Data, chatId, replies, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to handle a button press.");
 
             try
             {

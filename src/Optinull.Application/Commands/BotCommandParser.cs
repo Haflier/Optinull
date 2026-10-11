@@ -6,7 +6,7 @@ namespace Optinull.Application.Commands;
 public static class BotCommandParser
 {
     public const string Usage =
-        "Usage: /solve <problem> [sa|ga] [iterations=N] [seed=N] [key=value ...]";
+        "Usage: /solve <problem> [greedy|hc|sa|ga|all] [iterations=N] [seed=N] [key=value ...]";
 
     private static readonly HashSet<string> IterationKeys =
         new(["iterations", "iteration", "iter", "it"], StringComparer.OrdinalIgnoreCase);
@@ -36,8 +36,14 @@ public static class BotCommandParser
             case "/help":
                 return new HelpCommand();
 
+            case "/optimize":
+                return new OptimizeCommand();
+
             case "/solve":
-                return ParseSolve(parts, body);
+                return ParseSolve(parts, body, forceCompare: false);
+
+            case "/compare":
+                return ParseSolve(parts, body, forceCompare: true);
 
             case "/cancel":
                 return new CancelCommand();
@@ -47,13 +53,19 @@ public static class BotCommandParser
         }
     }
 
-    // /solve <problem> then, in any order: a solver (sa|ga) and key=value pairs.
-    private static BotCommand ParseSolve(string[] parts, string? body)
+    // /solve <problem> then, in any order: a solver (greedy|hc|sa|ga|all) and key=value pairs.
+    // /compare is /solve with every solver.
+    private static BotCommand ParseSolve(string[] parts, string? body, bool forceCompare)
     {
         if (parts.Length < 2)
-            return new InvalidCommand(Usage);
+        {
+            return new InvalidCommand(forceCompare
+                ? "Usage: /compare <problem> [iterations=N] [seed=N] [key=value ...]"
+                : Usage);
+        }
 
         SolverKind? solver = null;
+        var compare = forceCompare;
         int? iterations = null;
         int? seed = null;
         var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -64,16 +76,32 @@ public static class BotCommandParser
 
             if (equals < 0)
             {
+                if (IsCompareToken(token))
+                {
+                    if (solver is not null)
+                        return new InvalidCommand($"Choose one solver, or all. {Usage}");
+
+                    compare = true;
+                    continue;
+                }
+
                 var parsed = ParseSolver(token);
 
                 if (parsed is null)
                 {
                     return new InvalidCommand(
-                        $"Unknown option '{token}'. Use sa or ga, or key=value. {Usage}");
+                        $"Unknown option '{token}'. Use greedy, hc, sa, ga or all, or key=value. {Usage}");
+                }
+
+                if (compare)
+                {
+                    return new InvalidCommand(forceCompare
+                        ? "/compare already runs every solver; remove the solver name."
+                        : $"Choose one solver, or all. {Usage}");
                 }
 
                 if (solver is not null && solver != parsed)
-                    return new InvalidCommand($"Choose one solver, sa or ga. {Usage}");
+                    return new InvalidCommand($"Choose one solver, or all. {Usage}");
 
                 solver = parsed;
                 continue;
@@ -122,12 +150,19 @@ public static class BotCommandParser
             string.IsNullOrWhiteSpace(body) ? null : body,
             iterations,
             seed,
-            parameters.Count == 0 ? null : parameters);
+            parameters.Count == 0 ? null : parameters,
+            compare);
     }
+
+    private static bool IsCompareToken(string token) =>
+        token.Equals("all", StringComparison.OrdinalIgnoreCase) ||
+        token.Equals("compare", StringComparison.OrdinalIgnoreCase);
 
     private static SolverKind? ParseSolver(string token) =>
         token.ToLowerInvariant() switch
         {
+            "greedy" => SolverKind.Greedy,
+            "hc" => SolverKind.HillClimbing,
             "sa" => SolverKind.SimulatedAnnealing,
             "ga" => SolverKind.GeneticAlgorithm,
             _ => null
