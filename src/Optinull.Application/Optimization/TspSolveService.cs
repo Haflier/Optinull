@@ -18,19 +18,27 @@ public sealed record TspSolveResult(
 /// </summary>
 public sealed class TspSolveService
 {
-    public const int EvaluationBudget = 20_000;
+    public const int EvaluationBudget = SolveOptions.DefaultBudget;
 
     public TspSolveResult Solve(
         TspProblem problem,
         SolverKind kind = SolverKind.SimulatedAnnealing,
         int seed = SolveOptions.DefaultSeed,
         CancellationToken cancellationToken = default,
-        int? iterations = null)
+        int? iterations = null,
+        IProgress<double>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(problem);
 
         var searchProblem = new TspSearchProblem(problem);
         var random = new RandomSource(seed);
+
+        // Only the budgeted solvers have a meaningful progress.
+        var budgeted = kind is SolverKind.SimulatedAnnealing or SolverKind.GeneticAlgorithm;
+        var tracked = new ProgressTrackingProblem<TspTour>(
+            searchProblem,
+            iterations ?? EvaluationBudget,
+            budgeted ? progress : null);
 
         var greedyLength = TspEvaluator
             .Evaluate(problem, searchProblem.CreateGreedy(searchProblem.Evaluate))
@@ -41,6 +49,16 @@ public sealed class TspSolveService
 
         switch (kind)
         {
+            case SolverKind.Greedy:
+                name = SolverNames.Display(kind);
+                search = new GreedyBaseline<TspTour>().Solve(tracked, cancellationToken);
+                break;
+
+            case SolverKind.HillClimbing:
+                name = SolverNames.Display(kind);
+                search = new HillClimbing<TspTour>(random).Solve(tracked, cancellationToken);
+                break;
+
             case SolverKind.SimulatedAnnealing:
             {
                 // Start at the average edge of the nearest-neighbour tour and end
@@ -50,19 +68,19 @@ public sealed class TspSolveService
                 if (start <= 0)
                     start = 1;
 
-                name = "Simulated Annealing";
+                name = SolverNames.Display(kind);
                 search = new SimulatedAnnealing<TspTour>(
                         initialTemperature: start,
                         coolingRate: AnnealingBudget.CoolingRate(iterations),
                         iterationsPerTemperature: AnnealingBudget.IterationsPerTemperature,
                         minimumTemperature: start * 1e-5,
                         random: random)
-                    .Solve(searchProblem, cancellationToken);
+                    .Solve(tracked, cancellationToken);
                 break;
             }
 
             case SolverKind.GeneticAlgorithm:
-                name = "Genetic Algorithm";
+                name = SolverNames.Display(kind);
                 search = new GeneticAlgorithm<TspTour>(
                         populationSize: 50,
                         generations: 1_000_000,
@@ -72,7 +90,7 @@ public sealed class TspSolveService
                         localSearchTries: 10,
                         maxEvaluations: iterations ?? EvaluationBudget,
                         random: random)
-                    .Solve(searchProblem, cancellationToken);
+                    .Solve(tracked, cancellationToken);
                 break;
 
             default:

@@ -11,10 +11,17 @@ public static class SolveLimits
 /// <summary>
 /// Per-run settings from the chat. Iterations is the number of candidate
 /// solutions the solver may evaluate; null keeps each solver's own default.
+/// Progress, when given, receives 0..1 while a budgeted solver runs.
 /// </summary>
-public sealed record SolveOptions(int Seed = SolveOptions.DefaultSeed, int? Iterations = null)
+public sealed record SolveOptions(
+    int Seed = SolveOptions.DefaultSeed,
+    int? Iterations = null,
+    IProgress<double>? Progress = null)
 {
     public const int DefaultSeed = 42;
+
+    /// <summary>The evaluation budget the annealing and genetic solvers use by default.</summary>
+    public const int DefaultBudget = 20_000;
 }
 
 /// <summary>Turns an evaluation budget into a simulated annealing cooling rate.</summary>
