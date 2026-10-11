@@ -32,6 +32,15 @@ public sealed class TspModule : IProblemModule
         new("cities", "number of random cities", 3, TspInputLimits.Default.MaxCities, 20)
     ];
 
+    public IReadOnlyList<DatasetPreset> Presets { get; } =
+    [
+        new("small", "Small: 15 random cities", "tsp",
+            new Dictionary<string, string> { ["cities"] = "15" }),
+        new("medium", "Medium: random50 (50 cities)", "random50"),
+        new("large", "Large: 100 random cities", "tsp",
+            new Dictionary<string, string> { ["cities"] = "100" })
+    ];
+
     public bool TryGenerate(
         IReadOnlyDictionary<string, string> values,
         int seed,
@@ -131,7 +140,11 @@ internal sealed class TspInstance : IProblemInstance
 
     public string Description { get; }
 
-    public SolveReport Solve(
+    public string ScoreLabel => "Tour length";
+
+    public bool HigherIsBetter => false;
+
+    public SolverOutcome Run(
         SolverKind solver,
         SolveOptions options,
         CancellationToken cancellationToken)
@@ -141,8 +154,22 @@ internal sealed class TspInstance : IProblemInstance
             solver,
             options.Seed,
             cancellationToken,
-            options.Iterations);
+            options.Iterations,
+            options.Progress);
 
+        return new SolverOutcome(
+            solver,
+            result.SolverName,
+            result.Length,
+            result.Search.Elapsed,
+            result.Search.EvaluationCount,
+            ReportMapper.ToConvergenceSeries(result.SolverName, result.Search),
+            () => RenderImages(result),
+            Baseline: result.GreedyLength);
+    }
+
+    private IReadOnlyList<ReportImage> RenderImages(TspSolveResult result)
+    {
         var route = new RouteChartRenderer().Render(
             _problem.Cities.Select(city => new RoutePoint(city.X, city.Y)).ToList(),
             result.Tour.Cities,
@@ -152,12 +179,11 @@ internal sealed class TspInstance : IProblemInstance
             [ReportMapper.ToConvergenceSeries(result.SolverName, result.Search)],
             $"Convergence, {result.SolverName}");
 
-        return new SolveReport(
-            result.SolverName,
-            [
-                new ReportImage($"{Name}-route.png", Caption(result), route),
-                new ReportImage($"{Name}-convergence.png", "Convergence", convergence)
-            ]);
+        return
+        [
+            new ReportImage($"{Name}-route.png", Caption(result), route),
+            new ReportImage($"{Name}-convergence.png", "Convergence", convergence)
+        ];
     }
 
     private string Caption(TspSolveResult result)

@@ -76,6 +76,14 @@ public sealed class KnapsackModule : IProblemModule
         return true;
     }
 
+    public IReadOnlyList<DatasetPreset> Presets { get; } =
+    [
+        new("small", "Small: knap20 (20 items)", "knap20"),
+        new("medium", "Medium: 50 random items", "knapsack",
+            new Dictionary<string, string> { ["items"] = "50" }),
+        new("large", "Large: knap100 (100 items)", "knap100")
+    ];
+
     public bool TryGenerate(
         IReadOnlyDictionary<string, string> values,
         int seed,
@@ -114,7 +122,11 @@ internal sealed class KnapsackInstance : IProblemInstance
 
     public string Description { get; }
 
-    public SolveReport Solve(
+    public string ScoreLabel => "Value";
+
+    public bool HigherIsBetter => true;
+
+    public SolverOutcome Run(
         SolverKind solver,
         SolveOptions options,
         CancellationToken cancellationToken)
@@ -124,8 +136,22 @@ internal sealed class KnapsackInstance : IProblemInstance
             solver,
             options.Seed,
             cancellationToken,
-            options.Iterations);
+            options.Iterations,
+            options.Progress);
 
+        return new SolverOutcome(
+            solver,
+            result.SolverName,
+            result.Value,
+            result.Search.Elapsed,
+            result.Search.EvaluationCount,
+            ReportMapper.ToConvergenceSeries(result.SolverName, result.Search),
+            () => RenderImages(result),
+            Baseline: result.GreedyValue);
+    }
+
+    private IReadOnlyList<ReportImage> RenderImages(KnapsackSolveResult result)
+    {
         var points = _problem.Items
             .Select((item, index) => new KnapsackPoint(item.Weight, item.Value, result.Selection[index]))
             .ToList();
@@ -138,12 +164,11 @@ internal sealed class KnapsackInstance : IProblemInstance
             [ReportMapper.ToConvergenceSeries(result.SolverName, result.Search)],
             $"Convergence, {result.SolverName}");
 
-        return new SolveReport(
-            result.SolverName,
-            [
-                new ReportImage($"{Name}-items.png", Caption(result), items),
-                new ReportImage($"{Name}-convergence.png", "Convergence", convergence)
-            ]);
+        return
+        [
+            new ReportImage($"{Name}-items.png", Caption(result), items),
+            new ReportImage($"{Name}-convergence.png", "Convergence", convergence)
+        ];
     }
 
     private string Caption(KnapsackSolveResult result)

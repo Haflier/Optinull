@@ -36,6 +36,14 @@ public sealed class JobShopModule : IProblemModule
         new("machines", "number of machines", 1, JobShopInputLimits.Default.MaxMachines, 6)
     ];
 
+    public IReadOnlyList<DatasetPreset> Presets { get; } =
+    [
+        new("small", "Small: 5 jobs x 4 machines", "jobshop",
+            new Dictionary<string, string> { ["jobs"] = "5", ["machines"] = "4" }),
+        new("medium", "Medium: ft06 (6 x 6)", "ft06"),
+        new("large", "Large: ft10 (10 x 10)", "ft10")
+    ];
+
     public bool TryGenerate(
         IReadOnlyDictionary<string, string> values,
         int seed,
@@ -130,7 +138,11 @@ internal sealed class JobShopInstance : IProblemInstance
 
     public string Description { get; }
 
-    public SolveReport Solve(
+    public string ScoreLabel => "Makespan";
+
+    public bool HigherIsBetter => false;
+
+    public SolverOutcome Run(
         SolverKind solver,
         SolveOptions options,
         CancellationToken cancellationToken)
@@ -140,15 +152,28 @@ internal sealed class JobShopInstance : IProblemInstance
             solver,
             options.Seed,
             cancellationToken,
-            options.Iterations);
+            options.Iterations,
+            options.Progress);
+
+        return new SolverOutcome(
+            solver,
+            result.SolverName,
+            result.Makespan,
+            result.Search.Elapsed,
+            result.Search.EvaluationCount,
+            ReportMapper.ToConvergenceSeries(result.SolverName, result.Search),
+            () => RenderImages(result));
+    }
+
+    private IReadOnlyList<ReportImage> RenderImages(JobShopSolveResult result)
+    {
         var report = new JobShopReportService().Render(_problem, result);
 
-        return new SolveReport(
-            result.SolverName,
-            [
-                new ReportImage($"{Name}-gantt.png", Caption(result), report.GanttPng),
-                new ReportImage($"{Name}-convergence.png", "Convergence", report.ConvergencePng)
-            ]);
+        return
+        [
+            new ReportImage($"{Name}-gantt.png", Caption(result), report.GanttPng),
+            new ReportImage($"{Name}-convergence.png", "Convergence", report.ConvergencePng)
+        ];
     }
 
     private string Caption(JobShopSolveResult result)
