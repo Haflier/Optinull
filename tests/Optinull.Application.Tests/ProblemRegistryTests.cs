@@ -5,13 +5,14 @@ namespace Optinull.Application.Tests;
 public sealed class ProblemRegistryTests
 {
     [Fact]
-    public void Default_HasJobShopAndTsp()
+    public void Default_HasAllProblemModules()
     {
         var registry = ProblemRegistry.CreateDefault();
 
         Assert.NotNull(registry.FindModule("jobshop"));
         Assert.NotNull(registry.FindModule("TSP"));
-        Assert.Null(registry.FindModule("knapsack"));
+        Assert.NotNull(registry.FindModule("knapsack"));
+        Assert.Null(registry.FindModule("sudoku"));
     }
 
     [Theory]

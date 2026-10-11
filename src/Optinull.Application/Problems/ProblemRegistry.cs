@@ -33,7 +33,7 @@ public sealed class ProblemRegistry
     }
 
     public static ProblemRegistry CreateDefault() =>
-        new([new JobShopModule(), new TspModule()]);
+        new([new JobShopModule(), new TspModule(), new KnapsackModule()]);
 
     public IReadOnlyList<IProblemModule> Modules => _modules;
 
