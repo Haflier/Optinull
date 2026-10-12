@@ -42,25 +42,45 @@ public sealed class SolverComparisonService
         return Build(instance, outcomes);
     }
 
-    public static SolverOutcome PickBest(IReadOnlyList<SolverOutcome> outcomes, bool higherIsBetter)
+    public static SolverOutcome PickBest(IReadOnlyList<SolverOutcome> outcomes, bool higherIsBetter) =>
+        PickWinners(outcomes, higherIsBetter)[0];
+
+    /// <summary>
+    /// The solvers with the best score, narrowed to the fastest of them. Scores that differ
+    /// only by rounding (the same tour walked from another city) are equal, and so are times
+    /// that show the same number of milliseconds. More than one winner means a real tie.
+    /// </summary>
+    public static IReadOnlyList<SolverOutcome> PickWinners(
+        IReadOnlyList<SolverOutcome> outcomes,
+        bool higherIsBetter)
     {
         ArgumentNullException.ThrowIfNull(outcomes);
 
-        // Ties go to the earlier, cheaper solver.
-        return (higherIsBetter
-            ? outcomes.MaxBy(outcome => outcome.Score)
-            : outcomes.MinBy(outcome => outcome.Score))!;
+        var extreme = higherIsBetter
+            ? outcomes.Max(outcome => outcome.Score)
+            : outcomes.Min(outcome => outcome.Score);
+
+        var best = outcomes.Where(outcome => AreEqual(outcome.Score, extreme)).ToList();
+        var fastest = best.Min(Milliseconds);
+
+        return best.Where(outcome => Milliseconds(outcome) == fastest).ToList();
     }
+
+    private static long Milliseconds(SolverOutcome outcome) =>
+        (long)Math.Round(outcome.Elapsed.TotalMilliseconds);
+
+    private static bool AreEqual(double first, double second) =>
+        Math.Abs(first - second) <= Math.Max(Math.Abs(second) * 1e-9, 1e-12);
 
     private static SolveReport Build(IProblemInstance instance, IReadOnlyList<SolverOutcome> outcomes)
     {
-        var best = PickBest(outcomes, instance.HigherIsBetter);
+        var winners = PickWinners(outcomes, instance.HigherIsBetter);
 
         var bars = outcomes
             .Select(outcome => new ComparisonBar(
                 outcome.SolverName,
                 outcome.Score,
-                ReferenceEquals(outcome, best)))
+                winners.Any(winner => ReferenceEquals(winner, outcome))))
             .ToList();
 
         var scoreChart = new ComparisonChartRenderer().Render(
@@ -74,11 +94,11 @@ public sealed class SolverComparisonService
 
         var images = new List<ReportImage>
         {
-            new($"{instance.Name}-compare.png", Table(instance, outcomes, best), scoreChart),
+            new($"{instance.Name}-compare.png", Table(instance, outcomes, winners), scoreChart),
             new($"{instance.Name}-compare-convergence.png", "Convergence of every solver (Greedy builds a single solution, so it is a flat line)", convergence)
         };
 
-        images.AddRange(best.Render().Take(1));
+        images.AddRange(winners[0].Render().Take(1));
 
         return new SolveReport("Compare", images);
     }
@@ -103,14 +123,38 @@ public sealed class SolverComparisonService
     public static string Table(
         IProblemInstance instance,
         IReadOnlyList<SolverOutcome> outcomes,
-        SolverOutcome best)
+        IReadOnlyList<SolverOutcome> winners)
     {
         var lines = new List<string> { $"{instance.Description} - {instance.ScoreLabel}:" };
 
         lines.AddRange(outcomes.Select(outcome =>
             $"{outcome.SolverName}: {outcome.Score:0.##} ({outcome.Elapsed.TotalMilliseconds:0} ms)"));
 
-        lines.Add($"Best: {best.SolverName}");
+        var best = winners[0];
+        var names = string.Join(", ", winners.Select(winner => winner.SolverName));
+        var sameScore = outcomes.All(outcome => AreEqual(outcome.Score, best.Score));
+
+        if (winners.Count == 1)
+        {
+            lines.Add($"Best: {best.SolverName}");
+
+            if (sameScore)
+            {
+                lines.Add(
+                    "Every solver found the same result, so this problem is too small or too easy " +
+                    "to tell them apart.");
+            }
+        }
+        else
+        {
+            // Same score and the same time: there is no honest way to pick one.
+            lines.Add($"Best: {names} (tie)");
+            lines.Add(
+                winners.Count == outcomes.Count
+                    ? "Every solver found the same result in the same time, so this problem is too " +
+                      "small or too easy to tell them apart."
+                    : $"{names} found the same best result in the same time, so there is no clear winner.");
+        }
 
         var greedy = outcomes[0].Score;
 
