@@ -6,12 +6,18 @@ namespace Optinull.Application.Tests;
 public sealed class BotCommandParserTests
 {
     [Theory]
-    [InlineData("/start")]
     [InlineData("/help")]
     [InlineData("/HELP")]
     [InlineData("/help@OptinullBot")]
-    public void HelpAndStart_ParseAsHelp(string text) =>
+    public void Help_ParseAsHelp(string text) =>
         Assert.IsType<HelpCommand>(BotCommandParser.Parse(text));
+
+    [Theory]
+    [InlineData("/start")]
+    [InlineData("/START")]
+    [InlineData("/start@OptinullBot")]
+    public void Start_ParseAsStart(string text) =>
+        Assert.IsType<StartCommand>(BotCommandParser.Parse(text));
 
     [Theory]
     [InlineData("/solve ft06", "ft06", SolverKind.SimulatedAnnealing)]

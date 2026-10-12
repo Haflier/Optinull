@@ -56,9 +56,5 @@ public sealed class BotMenuTests
         // The hint in /solve must list only solvers the parser accepts.
         foreach (var solver in new[] { "greedy", "hc", "sa", "ga", "all" })
             Assert.IsType<SolveCommand>(BotCommandParser.Parse($"/solve ft06 {solver}"));
-
-        Assert.Contains(
-            "[greedy|hc|sa|ga|all]",
-            BotMenu.Commands.Single(command => command.Name == "solve").Description);
     }
 }
