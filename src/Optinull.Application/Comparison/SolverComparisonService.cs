@@ -68,20 +68,36 @@ public sealed class SolverComparisonService
             $"{instance.Name}: {instance.ScoreLabel} by solver",
             instance.ScoreLabel);
 
-        // Greedy builds one solution, so it has nothing to show over time.
         var convergence = new ConvergenceChartRenderer().Render(
-            outcomes.Skip(1).Select(outcome => outcome.Convergence).ToList(),
+            ConvergenceOf(outcomes),
             $"Convergence, {instance.Name}");
 
         var images = new List<ReportImage>
         {
             new($"{instance.Name}-compare.png", Table(instance, outcomes, best), scoreChart),
-            new($"{instance.Name}-compare-convergence.png", "Convergence of every solver", convergence)
+            new($"{instance.Name}-compare-convergence.png", "Convergence of every solver (Greedy builds a single solution, so it is a flat line)", convergence)
         };
 
         images.AddRange(best.Render().Take(1));
 
         return new SolveReport("Compare", images);
+    }
+
+    /// <summary>
+    /// One series per solver. Greedy builds a single solution, so it is stretched to the
+    /// longest run and drawn as a flat reference line to beat.
+    /// </summary>
+    public static IReadOnlyList<ConvergenceSeries> ConvergenceOf(IReadOnlyList<SolverOutcome> outcomes)
+    {
+        ArgumentNullException.ThrowIfNull(outcomes);
+
+        var longest = outcomes.Max(outcome => outcome.Convergence.FinalEvaluations);
+
+        return outcomes
+            .Select(outcome => outcome.Solver == SolverKind.Greedy
+                ? outcome.Convergence with { FinalEvaluations = longest }
+                : outcome.Convergence)
+            .ToList();
     }
 
     public static string Table(

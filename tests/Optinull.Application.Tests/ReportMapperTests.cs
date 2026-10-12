@@ -8,7 +8,7 @@ namespace Optinull.Application.Tests;
 public sealed class ReportMapperTests
 {
     [Fact]
-    public void ToGanttBars_MapsMachineToRowAndJobToColorAndLabel()
+    public void ToGanttBars_MapsMachineToRowAndJobToColorAndLabel_NumberedFromOne()
     {
         var schedule = new JobShopSchedule(
         [
@@ -22,17 +22,17 @@ public sealed class ReportMapperTests
         Assert.Equal(3, bars.Count);
 
         // Ordered by machine, then start time.
-        Assert.Equal((0, 0.0, 5.0, 0, "J0"),
+        Assert.Equal((0, 0.0, 5.0, 0, "J1"),
             (bars[0].Row, bars[0].Start, bars[0].End, bars[0].ColorIndex, bars[0].Label));
-        Assert.Equal((0, 5.0, 12.0, 1, "J1"),
+        Assert.Equal((0, 5.0, 12.0, 1, "J2"),
             (bars[1].Row, bars[1].Start, bars[1].End, bars[1].ColorIndex, bars[1].Label));
-        Assert.Equal((1, 0.0, 4.0, 1, "J1"),
+        Assert.Equal((1, 0.0, 4.0, 1, "J2"),
             (bars[2].Row, bars[2].Start, bars[2].End, bars[2].ColorIndex, bars[2].Label));
     }
 
     [Fact]
-    public void ToMachineLabels_NumbersMachinesFromZero() =>
-        Assert.Equal(["Machine 0", "Machine 1", "Machine 2"],
+    public void ToMachineLabels_NumbersMachinesFromOne() =>
+        Assert.Equal(["Machine 1", "Machine 2", "Machine 3"],
             ReportMapper.ToMachineLabels(3));
 
     [Fact]

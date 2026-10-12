@@ -110,6 +110,44 @@ public sealed class CompareAndProgressTests
                 new CancellationToken(canceled: true)));
 
     [Fact]
+    public void ConvergenceChart_IncludesGreedy_AsAFlatLineAsLongAsTheLongestRun()
+    {
+        var greedy = new SolverOutcome(
+            SolverKind.Greedy, "Greedy", 260, TimeSpan.Zero, 1,
+            new ConvergenceSeries("Greedy", [new ConvergencePointData(1, 260)], 1),
+            () => []);
+
+        var annealing = new SolverOutcome(
+            SolverKind.SimulatedAnnealing, "Simulated Annealing", 190, TimeSpan.Zero, 5000,
+            new ConvergenceSeries(
+                "Simulated Annealing",
+                [new ConvergencePointData(1, 300), new ConvergencePointData(900, 190)],
+                5000),
+            () => []);
+
+        var series = SolverComparisonService.ConvergenceOf([greedy, annealing]);
+
+        Assert.Equal(["Greedy", "Simulated Annealing"], series.Select(item => item.Name).ToArray());
+        Assert.Equal(5000, series[0].FinalEvaluations);
+        Assert.Equal(260, series[0].Points[0].Objective);
+        Assert.Equal(new[] { 300.0, 190.0 }, series[1].Points.Select(point => point.Objective).ToArray());
+        Assert.Equal(5000, series[1].FinalEvaluations);
+    }
+
+    [Theory]
+    [InlineData("knap20")]
+    [InlineData("ft06")]
+    public void Compare_ConvergenceOfEverySolver_StillRendersWithGreedyIncluded(string name)
+    {
+        var report = new SolverComparisonService().Compare(
+            Instance(name),
+            new SolveOptions(Seed: 1, Iterations: 300));
+
+        Assert.Contains("Greedy", report.Images[1].Caption);
+        Assert.Equal(PngSignature, report.Images[1].Png.Take(4).ToArray());
+    }
+
+    [Fact]
     public void PickBest_RespectsTheDirection_AndPrefersTheEarlierOnATie()
     {
         SolverOutcome[] outcomes = [Outcome("a", 5), Outcome("b", 3), Outcome("c", 3), Outcome("d", 9)];

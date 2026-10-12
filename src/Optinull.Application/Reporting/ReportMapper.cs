@@ -19,10 +19,11 @@ public static class ReportMapper
                 Start: operation.StartTime,
                 End: operation.EndTime,
                 ColorIndex: operation.JobId,
-                Label: $"J{operation.JobId}"))
+                Label: $"J{operation.JobId + 1}"))
             .ToList();
     }
 
+    /// <summary>Machines are numbered from 1 on the chart; row i is machine i + 1.</summary>
     public static IReadOnlyList<string> ToMachineLabels(int machineCount)
     {
         if (machineCount <= 0)
@@ -30,7 +31,7 @@ public static class ReportMapper
 
         return Enumerable
             .Range(0, machineCount)
-            .Select(machine => $"Machine {machine}")
+            .Select(machine => $"Machine {machine + 1}")
             .ToList();
     }
 
