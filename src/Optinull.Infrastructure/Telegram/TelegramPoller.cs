@@ -4,6 +4,7 @@ using Optinull.Application.Commands;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using TelegramBotCommand = global::Telegram.Bot.Types.BotCommand;
 
 namespace Optinull.Infrastructure.Telegram;
 
@@ -38,6 +39,8 @@ public sealed class TelegramPoller
     {
         var me = await _client.GetMe(cancellationToken);
         _logger.LogInformation("Bot @{Username} is running.", me.Username);
+
+        await PublishMenuAsync(cancellationToken);
 
         var offset = 0;
 
@@ -82,6 +85,31 @@ public sealed class TelegramPoller
                     break;
                 }
             }
+        }
+    }
+
+    // Registers the commands behind the "/" button next to the message box. Without
+    // this list Telegram shows no button, so users would have to remember the commands.
+    private async Task PublishMenuAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _client.SetMyCommands(
+                BotMenu.Commands.Select(command => new TelegramBotCommand
+                {
+                    Command = command.Name,
+                    Description = command.Description
+                }),
+                cancellationToken: cancellationToken);
+
+            _logger.LogInformation(
+                "Registered {Count} commands in the bot menu.",
+                BotMenu.Commands.Count);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // The bot works without the menu, so this must not stop it from starting.
+            _logger.LogWarning(exception, "Could not register the command menu.");
         }
     }
 

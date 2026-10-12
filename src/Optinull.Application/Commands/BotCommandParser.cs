@@ -33,6 +33,8 @@ public static class BotCommandParser
         switch (command)
         {
             case "/start":
+              return new StartCommand();
+
             case "/help":
                 return new HelpCommand();
 

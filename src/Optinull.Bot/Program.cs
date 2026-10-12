@@ -1,7 +1,6 @@
 using Optinull.Application.Commands;
 using Optinull.Application.Jobs;
 using Optinull.Application.Problems;
-using Optinull.Application.Problems;
 using Optinull.Bot;
 using Optinull.Infrastructure.Telegram;
 

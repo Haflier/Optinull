@@ -24,45 +24,74 @@ public sealed class BotCommandProcessor
         _conversations = new ConversationStore(timeProvider ?? TimeProvider.System);
     }
 
-    public string HelpText
+    public string StartText
     {
         get
         {
             var text = new StringBuilder();
 
             text.AppendLine("Welcome to Optinull.");
-            text.AppendLine("Optimization engine for solving and comparing optimization problems.");
+            text.AppendLine(
+                "Optimization engine for solving and comparing optimization problems.");
             text.AppendLine();
-            text.AppendLine("/optimize - pick a problem, a dataset and an algorithm with buttons");
-            text.AppendLine("  Choose Custom there and I will ask for your own data step by step.");
+            text.AppendLine("What would you like to do?");
+            text.AppendLine("/optimize - build a problem step by step using buttons");
+            text.AppendLine("/solve - solve a problem directly with a command");
+            text.AppendLine("/compare - compare optimization algorithms");
+            text.AppendLine();
+            text.Append("Use /help to see all commands and input formats.");
+
+            return text.ToString();
+        }
+    }
+
+    public string HelpText
+    {
+        get
+        {
+            var text = new StringBuilder();
+
+            text.AppendLine("Optinull Help");
+            text.AppendLine("Solve and compare optimization problems.");
+            text.AppendLine();
+            text.AppendLine("Commands");
+            text.AppendLine("/optimize - choose a problem, dataset and algorithm using buttons");
+            text.AppendLine("  Choose Custom to enter your own problem step by step.");
             text.AppendLine("/compare <problem> - run every algorithm on the same problem");
-            text.AppendLine();
             text.AppendLine(
                 "/solve <problem> [greedy|hc|sa|ga|all] [iterations=N] [seed=N] [key=value ...]");
-            text.AppendLine($"Built-in instances: {string.Join(", ", _registry.BuiltInNames)}");
-            text.AppendLine(
-                "greedy = fast heuristic, hc = hill climbing, sa = simulated annealing (default), " +
-                "ga = genetic algorithm, all = compare them");
-            text.AppendLine(
-                $"iterations = candidate solutions sa and ga may evaluate, " +
-                $"{SolveLimits.MinIterations}-{SolveLimits.MaxIterations} (default: solver's own)");
-            text.AppendLine("seed = same seed, same result");
+            text.AppendLine("/cancel - stop your current job");
             text.AppendLine();
             text.AppendLine(
-                "Your own problem: /solve <problem> [solver] with the instance on the " +
-                "next lines, or attach a .txt file with that as the caption.");
-            text.AppendLine("Or a random one: give the problem's settings instead of lines.");
+                $"Built-in instances: {string.Join(", ", _registry.BuiltInNames)}");
+            text.AppendLine();
+            text.AppendLine("Algorithms");
+            text.AppendLine("greedy - fast heuristic");
+            text.AppendLine("hc - hill climbing");
+            text.AppendLine("sa - simulated annealing (default)");
+            text.AppendLine("ga - genetic algorithm");
+            text.AppendLine("all - compare all algorithms");
+            text.AppendLine();
+            text.AppendLine(
+                $"iterations - candidate evaluations for SA and GA, " +
+                $"{SolveLimits.MinIterations}-{SolveLimits.MaxIterations} " +
+                "(default: solver's own setting)");
+            text.AppendLine("seed - use the same seed to reproduce a result");
+            text.AppendLine();
+            text.AppendLine("Custom input");
+            text.AppendLine(
+                "Provide the instance on the lines after /solve <problem> [solver],");
+            text.AppendLine("or attach a .txt file with the command as its caption.");
+            text.AppendLine("Alternatively, provide problem settings to generate a random instance.");
 
             foreach (var module in _registry.Modules)
             {
                 text.AppendLine();
                 text.AppendLine($"{module.Id} ({module.Title}): {module.CustomInputHelp}");
                 text.AppendLine(
-                    $"Random: /solve {module.Id} {ProblemParameterReader.Describe(module.Parameters)}");
+                    $"Random instance: /solve {module.Id} " +
+                    $"{ProblemParameterReader.Describe(module.Parameters)}");
             }
-
-            text.AppendLine();
-            text.Append("/cancel - stop your current job");
 
             return text.ToString();
         }
@@ -92,6 +121,10 @@ public sealed class BotCommandProcessor
 
         switch (command)
         {
+            case StartCommand:
+                await replies.SendTextAsync(StartText, cancellationToken);
+                break;
+
             case HelpCommand:
                 await replies.SendTextAsync(HelpText, cancellationToken);
                 break;

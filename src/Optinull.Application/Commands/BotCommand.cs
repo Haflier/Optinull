@@ -4,6 +4,8 @@ namespace Optinull.Application.Commands;
 
 public abstract record BotCommand;
 
+public sealed record StartCommand : BotCommand;
+
 public sealed record HelpCommand : BotCommand;
 
 public sealed record OptimizeCommand : BotCommand;
