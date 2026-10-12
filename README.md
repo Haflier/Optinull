@@ -1,4 +1,6 @@
-<h1 align="center">Optinull</h1>
+<p align="center">
+  <a <img src="docs/images/optinull-logo.png" alt="Optinull"></a>
+</p>
 
 <p align="center">
   <strong>An optimization engine you talk to.</strong><br/>
@@ -228,7 +230,7 @@ Optinull/
 │   ├── Optinull.Problems.Tests/
 │   ├── Optinull.Reporting.Tests/
 │   ├── Optinull.Application.Tests/
-│   └── Optinull.Integration.Tests/   # placeholder, no tests yet
+│   └── Optinull.Integration.Tests/
 └── Optinull.sln
 ```
 
@@ -257,11 +259,3 @@ Optinull is a work in progress. Today it is a single-process bot with an in-memo
 - [ ] CI pipeline and container image
 - [ ] Persistent job and conversation storage
 - [ ] More problem types (for example vehicle routing, bin packing)
-
-## Contributing
-
-Issues and pull requests are welcome. Before opening a PR, please make sure `dotnet build` and `dotnet test` pass, and add tests alongside any change in behavior.
-
-## License
-
-No license file has been added yet. Add one (for example MIT or Apache-2.0) before publishing or accepting contributions.
