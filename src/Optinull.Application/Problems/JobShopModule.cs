@@ -44,6 +44,8 @@ public sealed class JobShopModule : IProblemModule
         new("large", "Large: ft10 (10 x 10)", "ft10")
     ];
 
+    public IProblemDialog CreateDialog() => JobShopDialog.Create(this);
+
     public bool TryGenerate(
         IReadOnlyDictionary<string, string> values,
         int seed,

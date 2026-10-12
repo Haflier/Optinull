@@ -10,13 +10,18 @@ public sealed class BotCommandProcessor
 {
     private readonly JobQueue _queue;
     private readonly ProblemRegistry _registry;
+    private readonly ConversationStore _conversations;
 
-    public BotCommandProcessor(JobQueue queue, ProblemRegistry? registry = null)
+    public BotCommandProcessor(
+        JobQueue queue,
+        ProblemRegistry? registry = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(queue);
 
         _queue = queue;
         _registry = registry ?? ProblemRegistry.CreateDefault();
+        _conversations = new ConversationStore(timeProvider ?? TimeProvider.System);
     }
 
     public string HelpText
@@ -29,6 +34,7 @@ public sealed class BotCommandProcessor
             text.AppendLine("Optimization engine for solving and comparing optimization problems.");
             text.AppendLine();
             text.AppendLine("/optimize - pick a problem, a dataset and an algorithm with buttons");
+            text.AppendLine("  Choose Custom there and I will ask for your own data step by step.");
             text.AppendLine("/compare <problem> - run every algorithm on the same problem");
             text.AppendLine();
             text.AppendLine(
@@ -70,7 +76,21 @@ public sealed class BotCommandProcessor
     {
         ArgumentNullException.ThrowIfNull(replies);
 
-        switch (BotCommandParser.Parse(text))
+        var command = BotCommandParser.Parse(text);
+
+        // Plain text while the user is entering their own data is an answer.
+        if (!text.TrimStart().StartsWith('/') &&
+            _conversations.Get(chatId) is Collecting collecting)
+        {
+            await ContinueDialogAsync(collecting, chatId, text, replies, cancellationToken);
+            return;
+        }
+
+        // Starting something new abandons a half-finished dialog.
+        if (command is OptimizeCommand or SolveCommand)
+            _conversations.Clear(chatId);
+
+        switch (command)
         {
             case HelpCommand:
                 await replies.SendTextAsync(HelpText, cancellationToken);
@@ -172,13 +192,23 @@ public sealed class BotCommandProcessor
             return;
         }
 
+        await QueueAsync(command, instance!, chatId, replies, cancellationToken);
+    }
+
+    private async Task QueueAsync(
+        SolveCommand command,
+        IProblemInstance instance,
+        long chatId,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
         // The parsed instance travels with the job; drop the raw text.
         var queued = command with { InstanceText = null };
 
-        var message = _queue.TryEnqueue(chatId, queued, replies, instance!) switch
+        var message = _queue.TryEnqueue(chatId, queued, replies, instance) switch
         {
             Enqueued enqueued =>
-                $"Queued job #{enqueued.Job.Id} ({instance!.Description}, " +
+                $"Queued job #{enqueued.Job.Id} ({instance.Description}, " +
                 $"{(command.CompareAll ? "all solvers" : SolverNames.Display(command.Solver))}" +
                 $"{(command.Iterations is { } n ? $", {n} iterations" : string.Empty)}). " +
                 "I'll send the charts when it's done. Send /cancel to stop it.",
@@ -249,15 +279,15 @@ public sealed class BotCommandProcessor
                 break;
 
             case 3 when parts[2] == "custom":
-                await replies.SendTextAsync(
-                    $"Send your own {module.Title} data as /solve {module.Id} [greedy|hc|sa|ga|all] " +
-                    "followed by the instance on the next lines, or attach a .txt file " +
-                    $"with that caption.\n\n{module.CustomInputHelp}",
-                    cancellationToken);
+                await StartCustomDialogAsync(module, chatId, replies, cancellationToken);
                 break;
 
             case 3 when module.Presets.Any(preset => preset.Key == parts[2]):
                 await ShowAlgorithmsAsync(module, parts[2], replies, cancellationToken);
+                break;
+
+            case 4 when parts[2] == "custom":
+                await StartCustomJobAsync(module, parts[3], chatId, replies, cancellationToken);
                 break;
 
             case 4:
@@ -291,6 +321,21 @@ public sealed class BotCommandProcessor
             cancellationToken);
     }
 
+    private static List<IReadOnlyList<Choice>> AlgorithmRows(string moduleId, string datasetKey) =>
+        Algorithms
+            .Select(algorithm => Button(algorithm.Label, $"o:{moduleId}:{datasetKey}:{algorithm.Key}"))
+            .ToList();
+
+    private static (SolverKind Solver, bool Compare) ParseAlgorithm(string key) =>
+        key switch
+        {
+            "greedy" => (SolverKind.Greedy, false),
+            "hc" => (SolverKind.HillClimbing, false),
+            "ga" => (SolverKind.GeneticAlgorithm, false),
+            "all" => (SolverKind.SimulatedAnnealing, true),
+            _ => (SolverKind.SimulatedAnnealing, false)
+        };
+
     private Task ShowAlgorithmsAsync(
         IProblemModule module,
         string presetKey,
@@ -299,13 +344,9 @@ public sealed class BotCommandProcessor
     {
         var preset = module.Presets.First(candidate => candidate.Key == presetKey);
 
-        var rows = Algorithms
-            .Select(algorithm => Button(algorithm.Label, $"o:{module.Id}:{presetKey}:{algorithm.Key}"))
-            .ToList();
-
         return replies.ShowChoicesAsync(
             $"{Capitalize(module.Title)}: {preset.Label}\nChoose algorithm:",
-            rows,
+            AlgorithmRows(module.Id, presetKey),
             cancellationToken);
     }
 
@@ -326,14 +367,7 @@ public sealed class BotCommandProcessor
             return;
         }
 
-        var (solver, compare) = algorithm.Key switch
-        {
-            "greedy" => (SolverKind.Greedy, false),
-            "hc" => (SolverKind.HillClimbing, false),
-            "ga" => (SolverKind.GeneticAlgorithm, false),
-            "all" => (SolverKind.SimulatedAnnealing, true),
-            _ => (SolverKind.SimulatedAnnealing, false)
-        };
+        var (solver, compare) = ParseAlgorithm(algorithm.Key);
 
         // Replace the buttons with what was chosen, then start like /solve does.
         await replies.ShowChoicesAsync(
@@ -348,11 +382,110 @@ public sealed class BotCommandProcessor
             cancellationToken);
     }
 
+    // ---- Entering your own data, one question at a time -----------------------
+
+    private async Task StartCustomDialogAsync(
+        IProblemModule module,
+        long chatId,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        var dialog = module.CreateDialog();
+
+        _conversations.Set(chatId, new Collecting(module, dialog));
+
+        await replies.ShowChoicesAsync(
+            $"Problem: {Capitalize(module.Title)}\nDataset: Custom",
+            [],
+            cancellationToken);
+
+        await replies.SendTextAsync(
+            $"{dialog.Start()}\n\n(Send /cancel to stop.)",
+            cancellationToken);
+    }
+
+    private async Task ContinueDialogAsync(
+        Collecting state,
+        long chatId,
+        string text,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        switch (state.Dialog.Answer(text))
+        {
+            case DialogAsk ask:
+                await replies.SendTextAsync(ask.Text, cancellationToken);
+                break;
+
+            case DialogFailed failed:
+                _conversations.Clear(chatId);
+                await replies.SendTextAsync(
+                    $"{failed.Message}\n\nSend /optimize to start again.",
+                    cancellationToken);
+                break;
+
+            case DialogDone done:
+                _conversations.Set(chatId, new Ready(state.Module, done.Instance));
+
+                var recap = done.Notes is null ? string.Empty : done.Notes + "\n\n";
+
+                await replies.ShowChoicesAsync(
+                    $"{recap}Got it: {done.Instance.Description}.\nChoose algorithm:",
+                    AlgorithmRows(state.Module.Id, "custom"),
+                    cancellationToken);
+                break;
+        }
+    }
+
+    private async Task StartCustomJobAsync(
+        IProblemModule module,
+        string algorithmKey,
+        long chatId,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        var algorithm = Algorithms.FirstOrDefault(candidate => candidate.Key == algorithmKey);
+
+        if (algorithm.Key is null ||
+            _conversations.Get(chatId) is not Ready ready ||
+            ready.Module.Id != module.Id)
+        {
+            await SendStaleAsync(replies, cancellationToken);
+            return;
+        }
+
+        _conversations.Clear(chatId);
+
+        var (solver, compare) = ParseAlgorithm(algorithm.Key);
+
+        await replies.ShowChoicesAsync(
+            $"Problem: {Capitalize(module.Title)}\nDataset: Custom ({ready.Instance.Description})\n" +
+            $"Algorithm: {algorithm.Label}",
+            [],
+            cancellationToken);
+
+        await QueueAsync(
+            new SolveCommand("custom", solver, CompareAll: compare),
+            ready.Instance,
+            chatId,
+            replies,
+            cancellationToken);
+    }
+
     private async Task CancelAsync(
         long chatId,
         IBotReplies replies,
         CancellationToken cancellationToken)
     {
+        // Cancelling in the middle of entering data just drops the data.
+        if (_conversations.Clear(chatId))
+        {
+            await replies.SendTextAsync(
+                "Cancelled. Send /optimize to start again.",
+                cancellationToken);
+            return;
+        }
+
         var result = _queue.Cancel(chatId);
 
         var message = result switch

@@ -84,6 +84,8 @@ public sealed class KnapsackModule : IProblemModule
         new("large", "Large: knap100 (100 items)", "knap100")
     ];
 
+    public IProblemDialog CreateDialog() => KnapsackDialog.Create(this);
+
     public bool TryGenerate(
         IReadOnlyDictionary<string, string> values,
         int seed,

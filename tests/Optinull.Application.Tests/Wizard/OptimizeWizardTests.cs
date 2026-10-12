@@ -67,15 +67,17 @@ public sealed class OptimizeWizardTests
     }
 
     [Fact]
-    public async Task Custom_ExplainsHowToSendYourOwnData()
+    public async Task Custom_StartsAGuidedDialog_WithTheFirstQuestion()
     {
         var (processor, queue) = Create();
         var replies = new FakeReplies();
 
         await processor.ProcessCallbackAsync("o:tsp:custom", 1, replies);
 
-        Assert.Contains("/solve tsp", replies.Texts[0]);
-        Assert.Contains("x y", replies.Texts[0]);
+        Assert.StartsWith("Problem:", replies.Choices[^1].Text);
+        Assert.Empty(replies.Choices[^1].Choices);
+        Assert.Contains("How many cities", replies.Texts[0]);
+        Assert.Contains("/cancel", replies.Texts[0]);
         Assert.False(queue.Reader.TryRead(out _));
     }
 

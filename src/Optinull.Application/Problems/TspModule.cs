@@ -41,6 +41,8 @@ public sealed class TspModule : IProblemModule
             new Dictionary<string, string> { ["cities"] = "100" })
     ];
 
+    public IProblemDialog CreateDialog() => TspDialog.Create(this);
+
     public bool TryGenerate(
         IReadOnlyDictionary<string, string> values,
         int seed,

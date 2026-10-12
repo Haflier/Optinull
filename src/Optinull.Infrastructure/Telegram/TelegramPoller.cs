@@ -14,6 +14,10 @@ public sealed class TelegramPoller
 {
     private const int MaxDocumentBytes = 30_000;
 
+    // The last task of each chat: a chat's messages are handled one after another,
+    // because answers in a guided dialog must not overtake each other.
+    private readonly Dictionary<long, Task> _chatTails = [];
+
     private readonly TelegramBotClient _client;
     private readonly BotCommandProcessor _processor;
     private readonly ILogger<TelegramPoller> _logger;
@@ -52,9 +56,13 @@ public sealed class TelegramPoller
                     offset = update.Id + 1;
 
                     if (update.Message is { } message)
-                        _ = HandleAsync(message, cancellationToken);
+                        InOrder(message.Chat.Id, () => HandleAsync(message, cancellationToken));
                     else if (update.CallbackQuery is { } callback)
-                        _ = HandleCallbackAsync(callback, cancellationToken);
+                    {
+                        InOrder(
+                            callback.Message?.Chat.Id ?? callback.From.Id,
+                            () => HandleCallbackAsync(callback, cancellationToken));
+                    }
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -75,6 +83,15 @@ public sealed class TelegramPoller
                 }
             }
         }
+    }
+
+    // Only the polling loop calls this, so the dictionary needs no lock. The work
+    // catches its own errors, so a failure never blocks the chat's next message.
+    private void InOrder(long chatId, Func<Task> work)
+    {
+        _chatTails[chatId] = _chatTails.TryGetValue(chatId, out var tail)
+            ? tail.ContinueWith(_ => work(), TaskScheduler.Default).Unwrap()
+            : work();
     }
 
     private async Task HandleAsync(Message message, CancellationToken cancellationToken)
@@ -155,7 +172,8 @@ public sealed class TelegramPoller
     }
 
     // A .txt file whose caption is a command, e.g. "/solve custom ga": the file
-    // content becomes the lines after the command.
+    // content becomes the lines after the command. Without a caption the file is
+    // an answer to the question the bot just asked.
     private async Task<string?> ReadDocumentCommandAsync(
         Message message,
         Document document,
@@ -163,8 +181,9 @@ public sealed class TelegramPoller
         CancellationToken cancellationToken)
     {
         var caption = message.Caption ?? string.Empty;
+        var isCommand = caption.TrimStart().StartsWith('/');
 
-        if (!caption.TrimStart().StartsWith('/'))
+        if (!isCommand && !string.IsNullOrWhiteSpace(caption))
             return null;
 
         if (document.FileSize is > MaxDocumentBytes)
@@ -179,6 +198,8 @@ public sealed class TelegramPoller
 
         await _client.GetInfoAndDownloadFile(document.FileId, stream, cancellationToken);
 
-        return caption.TrimEnd() + "\n" + Encoding.UTF8.GetString(stream.ToArray());
+        var content = Encoding.UTF8.GetString(stream.ToArray());
+
+        return isCommand ? caption.TrimEnd() + "\n" + content : content;
     }
 }

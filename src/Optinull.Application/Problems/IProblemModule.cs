@@ -119,6 +119,9 @@ public interface IProblemModule
         string name,
         [NotNullWhen(true)] out IProblemInstance? instance);
 
+    /// <summary>Starts the guided, step-by-step way to enter your own problem.</summary>
+    IProblemDialog CreateDialog();
+
     bool TryParseCustom(
         string? text,
         [NotNullWhen(true)] out IProblemInstance? instance,
