@@ -34,7 +34,7 @@ Bot:   [comparison chart]  [convergence chart]  [Gantt chart]
 
 | | |
 |---|---|
-| **Four solvers** | Greedy baseline, Hill Climbing, Simulated Annealing, Genetic Algorithm |
+| **Five solvers** | Greedy baseline, Hill Climbing, Iterated Local Search, Simulated Annealing, Genetic Algorithm |
 | **Three problem types** | Job Shop Scheduling, Traveling Salesman, 0/1 Knapsack |
 | **Built-in benchmarks** | `ft06` and `ft10` (with known optima 55 and 930), plus TSP and knapsack instances |
 | **Bring your own data** | Paste an instance in the message, attach a `.txt` file, or step through a guided dialog |
@@ -59,11 +59,10 @@ Bot:   [comparison chart]  [convergence chart]  [Gantt chart]
 |---|---|---|
 | `greedy` | Greedy baseline | Fast constructive heuristic. Also the reference for the "improvement over greedy" figure in results |
 | `hc` | Hill Climbing | Local search over a neighborhood |
+| `ils` | Iterated Local Search | Hill climbing, then perturb and climb again. Stops starting new restarts once the evaluation budget is spent |
 | `sa` | Simulated Annealing | **Default.** Cooling rate is derived from the evaluation budget |
 | `ga` | Genetic Algorithm | Tournament selection, elitism, mutation, and a local-search step. Job shop uses precedence-preserving crossover and insertion mutation |
 | `all` | Compare all of the above | Same as `/compare` |
-
-The library also contains an Iterated Local Search implementation that is not yet exposed through the bot.
 
 ## Quick start
 
@@ -119,6 +118,7 @@ Open your bot in Telegram and send `/start`.
 ```text
 /solve ft06                         # Simulated Annealing on the ft06 benchmark
 /solve ft10 ga iterations=50000     # Genetic Algorithm with a larger budget
+/solve ft10 ils                     # Iterated Local Search
 /solve tsp cities=30 sa seed=7      # Random 30-city instance, reproducible
 /compare knapsack items=50          # Every solver on a random knapsack
 /compare random50                   # Every solver on a built-in TSP instance
@@ -253,7 +253,7 @@ Optinull is a work in progress. Today it is a single-process bot with an in-memo
 - [x] Telegram bot with guided `/optimize` flow, `/solve`, `/compare`, `/cancel`
 - [x] Charts: convergence, comparison, Gantt, route, knapsack
 - [x] Progress tracking, time limits, per-chat job limits
-- [ ] Expose Iterated Local Search in the bot
+- [x] Expose Iterated Local Search in the bot
 - [ ] Expose solver tuning (temperature, population size, mutation rate, ...) through chat parameters
 - [ ] Integration tests
 - [ ] CI pipeline and container image
