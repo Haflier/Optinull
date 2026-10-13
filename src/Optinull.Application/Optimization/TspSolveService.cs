@@ -34,7 +34,9 @@ public sealed class TspSolveService
         var random = new RandomSource(seed);
 
         // Only the budgeted solvers have a meaningful progress.
-        var budgeted = kind is SolverKind.SimulatedAnnealing or SolverKind.GeneticAlgorithm;
+        var budgeted = kind is SolverKind.SimulatedAnnealing
+            or SolverKind.GeneticAlgorithm
+            or SolverKind.IteratedLocalSearch;
         var tracked = new ProgressTrackingProblem<TspTour>(
             searchProblem,
             iterations ?? EvaluationBudget,
@@ -57,6 +59,16 @@ public sealed class TspSolveService
             case SolverKind.HillClimbing:
                 name = SolverNames.Display(kind);
                 search = new HillClimbing<TspTour>(random).Solve(tracked, cancellationToken);
+                break;
+
+            case SolverKind.IteratedLocalSearch:
+                name = SolverNames.Display(kind);
+                search = new IteratedLocalSearch<TspTour>(
+                        perturbationSize: 3,
+                        iterationCount: int.MaxValue,
+                        random: random,
+                        maxEvaluations: iterations ?? EvaluationBudget)
+                    .Solve(tracked, cancellationToken);
                 break;
 
             case SolverKind.SimulatedAnnealing:

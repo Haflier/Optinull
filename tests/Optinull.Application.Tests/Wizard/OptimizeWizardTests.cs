@@ -56,13 +56,14 @@ public sealed class OptimizeWizardTests
             {
                 "o:jobshop:medium:greedy",
                 "o:jobshop:medium:hc",
+                "o:jobshop:medium:ils",
                 "o:jobshop:medium:sa",
                 "o:jobshop:medium:ga",
                 "o:jobshop:medium:all"
             },
             Data(replies));
         Assert.Equal(
-            new[] { "Greedy", "Hill Climbing", "Simulated Annealing", "Genetic Algorithm", "Compare All" },
+            new[] { "Greedy", "Hill Climbing", "Iterated Local Search", "Simulated Annealing", "Genetic Algorithm", "Compare All" },
             replies.Choices[^1].Choices.Select(choice => choice.Label).ToArray());
     }
 
@@ -164,7 +165,7 @@ public sealed class OptimizeWizardTests
 
             foreach (var preset in module.Presets)
             {
-                foreach (var algorithm in new[] { "greedy", "hc", "sa", "ga", "all" })
+                foreach (var algorithm in new[] { "greedy", "hc", "ils", "sa", "ga", "all" })
                 {
                     var replies = new FakeReplies();
 
@@ -185,7 +186,7 @@ public sealed class OptimizeWizardTests
             jobs++;
 
         Assert.Equal(started, jobs);
-        Assert.Equal(45, jobs);
+        Assert.Equal(54, jobs);
     }
 
     [Fact]

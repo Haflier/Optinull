@@ -59,7 +59,7 @@ public sealed class BotCommandProcessor
             text.AppendLine("  Choose Custom to enter your own problem step by step.");
             text.AppendLine("/compare <problem> - run every algorithm on the same problem");
             text.AppendLine(
-                "/solve <problem> [greedy|hc|sa|ga|all] [iterations=N] [seed=N] [key=value ...]");
+                "/solve <problem> [greedy|hc|ils|sa|ga|all] [iterations=N] [seed=N] [key=value ...]");
             text.AppendLine("/cancel - stop your current job");
             text.AppendLine();
             text.AppendLine(
@@ -68,12 +68,13 @@ public sealed class BotCommandProcessor
             text.AppendLine("Algorithms");
             text.AppendLine("greedy - fast heuristic");
             text.AppendLine("hc - hill climbing");
+            text.AppendLine("ils - iterated local search");
             text.AppendLine("sa - simulated annealing (default)");
             text.AppendLine("ga - genetic algorithm");
             text.AppendLine("all - compare all algorithms");
             text.AppendLine();
             text.AppendLine(
-                $"iterations - candidate evaluations for SA and GA, " +
+                $"iterations - candidate evaluations for ILS, SA and GA, " +
                 $"{SolveLimits.MinIterations}-{SolveLimits.MaxIterations} " +
                 "(default: solver's own setting)");
             text.AppendLine("seed - use the same seed to reproduce a result");
@@ -264,6 +265,7 @@ public sealed class BotCommandProcessor
     [
         ("greedy", "Greedy"),
         ("hc", "Hill Climbing"),
+        ("ils", "Iterated Local Search"),
         ("sa", "Simulated Annealing"),
         ("ga", "Genetic Algorithm"),
         ("all", "Compare All")
@@ -364,6 +366,7 @@ public sealed class BotCommandProcessor
         {
             "greedy" => (SolverKind.Greedy, false),
             "hc" => (SolverKind.HillClimbing, false),
+            "ils" => (SolverKind.IteratedLocalSearch, false),
             "ga" => (SolverKind.GeneticAlgorithm, false),
             "all" => (SolverKind.SimulatedAnnealing, true),
             _ => (SolverKind.SimulatedAnnealing, false)

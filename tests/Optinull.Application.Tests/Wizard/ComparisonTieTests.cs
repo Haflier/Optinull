@@ -68,7 +68,7 @@ public sealed class ComparisonTieTests
         // clock, so only the message about the tie is certain.
         Assert.Contains("Best:", table);
         Assert.Contains("Improvement over greedy: 0.0%", table);
-        Assert.Contains("same result", table);
+        Assert.Matches("same (best )?result", table);
 
         Assert.All(report.Images, image => Assert.Equal(PngSignature, image.Png.Take(4).ToArray()));
     }

@@ -60,7 +60,7 @@ public sealed class CompareAndProgressTests
 
         var table = report.Images[0].Caption;
 
-        foreach (var solver in new[] { "Greedy", "Hill Climbing", "Simulated Annealing", "Genetic Algorithm" })
+        foreach (var solver in new[] { "Greedy", "Hill Climbing", "Iterated Local Search", "Simulated Annealing", "Genetic Algorithm" })
             Assert.Contains(solver, table);
 
         Assert.Contains("Best:", table);

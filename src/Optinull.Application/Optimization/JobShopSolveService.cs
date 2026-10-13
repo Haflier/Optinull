@@ -52,6 +52,19 @@ public sealed class JobShopSolveService
                         cancellationToken);
                 break;
 
+            case SolverKind.IteratedLocalSearch:
+                name = SolverNames.Display(kind);
+                search = new IteratedLocalSearch<JobSequence>(
+                        perturbationSize: 3,
+                        iterationCount: int.MaxValue,
+                        random: random,
+                        maxEvaluations: budget)
+                    .Solve(
+                        new ProgressTrackingProblem<JobSequence>(
+                            new JobShopSearchProblem(problem), budget, progress),
+                        cancellationToken);
+                break;
+
             case SolverKind.SimulatedAnnealing:
                 name = SolverNames.Display(kind);
                 search = new SimulatedAnnealing<JobSequence>(

@@ -33,7 +33,9 @@ public sealed class KnapsackSolveService
         var searchProblem = new KnapsackSearchProblem(problem);
         var random = new RandomSource(seed);
 
-        var budgeted = kind is SolverKind.SimulatedAnnealing or SolverKind.GeneticAlgorithm;
+        var budgeted = kind is SolverKind.SimulatedAnnealing
+            or SolverKind.GeneticAlgorithm
+            or SolverKind.IteratedLocalSearch;
         var tracked = new ProgressTrackingProblem<KnapsackSelection>(
             searchProblem,
             iterations ?? EvaluationBudget,
@@ -56,6 +58,16 @@ public sealed class KnapsackSolveService
             case SolverKind.HillClimbing:
                 name = SolverNames.Display(kind);
                 search = new HillClimbing<KnapsackSelection>(random).Solve(tracked, cancellationToken);
+                break;
+
+            case SolverKind.IteratedLocalSearch:
+                name = SolverNames.Display(kind);
+                search = new IteratedLocalSearch<KnapsackSelection>(
+                        perturbationSize: 3,
+                        iterationCount: int.MaxValue,
+                        random: random,
+                        maxEvaluations: iterations ?? EvaluationBudget)
+                    .Solve(tracked, cancellationToken);
                 break;
 
             case SolverKind.SimulatedAnnealing:

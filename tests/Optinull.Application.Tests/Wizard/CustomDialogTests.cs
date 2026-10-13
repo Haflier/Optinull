@@ -72,7 +72,7 @@ public sealed class CustomDialogTests
         var choices = done.Choices[^1];
         Assert.Contains("Got it: custom job shop, 2 jobs x 2 machines", choices.Text);
         Assert.Equal(
-            new[] { "greedy", "hc", "sa", "ga", "all" }.Select(key => $"o:jobshop:custom:{key}"),
+            new[] { "greedy", "hc", "ils", "sa", "ga", "all" }.Select(key => $"o:jobshop:custom:{key}"),
             choices.Choices.Select(choice => choice.Data));
 
         var started = await chat.PressAsync("o:jobshop:custom:sa");

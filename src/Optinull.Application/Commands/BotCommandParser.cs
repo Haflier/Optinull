@@ -6,7 +6,7 @@ namespace Optinull.Application.Commands;
 public static class BotCommandParser
 {
     public const string Usage =
-        "Usage: /solve <problem> [greedy|hc|sa|ga|all] [iterations=N] [seed=N] [key=value ...]";
+        "Usage: /solve <problem> [greedy|hc|ils|sa|ga|all] [iterations=N] [seed=N] [key=value ...]";
 
     private static readonly HashSet<string> IterationKeys =
         new(["iterations", "iteration", "iter", "it"], StringComparer.OrdinalIgnoreCase);
@@ -55,7 +55,7 @@ public static class BotCommandParser
         }
     }
 
-    // /solve <problem> then, in any order: a solver (greedy|hc|sa|ga|all) and key=value pairs.
+    // /solve <problem> then, in any order: a solver (greedy|hc|ils|sa|ga|all) and key=value pairs.
     // /compare is /solve with every solver.
     private static BotCommand ParseSolve(string[] parts, string? body, bool forceCompare)
     {
@@ -92,7 +92,7 @@ public static class BotCommandParser
                 if (parsed is null)
                 {
                     return new InvalidCommand(
-                        $"Unknown option '{token}'. Use greedy, hc, sa, ga or all, or key=value. {Usage}");
+                        $"Unknown option '{token}'. Use greedy, hc, ils, sa, ga or all, or key=value. {Usage}");
                 }
 
                 if (compare)
@@ -165,6 +165,7 @@ public static class BotCommandParser
         {
             "greedy" => SolverKind.Greedy,
             "hc" => SolverKind.HillClimbing,
+            "ils" => SolverKind.IteratedLocalSearch,
             "sa" => SolverKind.SimulatedAnnealing,
             "ga" => SolverKind.GeneticAlgorithm,
             _ => null

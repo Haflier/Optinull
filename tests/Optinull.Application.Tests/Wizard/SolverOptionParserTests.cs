@@ -12,6 +12,7 @@ public sealed class SolverOptionParserTests
     [Theory]
     [InlineData("/solve ft06 greedy", SolverKind.Greedy)]
     [InlineData("/solve ft06 HC", SolverKind.HillClimbing)]
+    [InlineData("/solve ft06 ILS", SolverKind.IteratedLocalSearch)]
     [InlineData("/solve ft06 sa", SolverKind.SimulatedAnnealing)]
     [InlineData("/solve ft06 ga", SolverKind.GeneticAlgorithm)]
     [InlineData("/solve ft06", SolverKind.SimulatedAnnealing)]

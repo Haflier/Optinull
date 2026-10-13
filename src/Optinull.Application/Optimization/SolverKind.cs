@@ -4,6 +4,7 @@ public enum SolverKind
 {
     Greedy,
     HillClimbing,
+    IteratedLocalSearch,
     SimulatedAnnealing,
     GeneticAlgorithm
 }
@@ -15,6 +16,7 @@ public static class SolverNames
         {
             SolverKind.Greedy => "Greedy",
             SolverKind.HillClimbing => "Hill Climbing",
+            SolverKind.IteratedLocalSearch => "Iterated Local Search",
             SolverKind.SimulatedAnnealing => "Simulated Annealing",
             SolverKind.GeneticAlgorithm => "Genetic Algorithm",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))

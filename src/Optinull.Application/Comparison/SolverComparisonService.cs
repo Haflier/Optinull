@@ -11,6 +11,7 @@ public sealed class SolverComparisonService
     [
         SolverKind.Greedy,
         SolverKind.HillClimbing,
+        SolverKind.IteratedLocalSearch,
         SolverKind.SimulatedAnnealing,
         SolverKind.GeneticAlgorithm
     ];

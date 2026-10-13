@@ -54,7 +54,7 @@ public sealed class BotMenuTests
     public void Descriptions_MentionNothingTheBotCannotDo()
     {
         // The hint in /solve must list only solvers the parser accepts.
-        foreach (var solver in new[] { "greedy", "hc", "sa", "ga", "all" })
+        foreach (var solver in new[] { "greedy", "hc", "ils", "sa", "ga", "all" })
             Assert.IsType<SolveCommand>(BotCommandParser.Parse($"/solve ft06 {solver}"));
     }
 }
