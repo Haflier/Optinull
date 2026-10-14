@@ -254,7 +254,7 @@ Optinull is a work in progress. Today it is a single-process bot with an in-memo
 - [x] Charts: convergence, comparison, Gantt, route, knapsack
 - [x] Progress tracking, time limits, per-chat job limits
 - [x] Expose Iterated Local Search in the bot
-- [ ] Expose solver tuning (temperature, population size, mutation rate, ...) through chat parameters
+- [x] Expose solver tuning (temperature, population size, mutation rate, ...) through chat parameters
 - [ ] Integration tests
 - [ ] CI pipeline and container image
 - [ ] Persistent job and conversation storage
