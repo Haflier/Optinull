@@ -16,19 +16,9 @@
 
 ---
 
-## What is Optinull?
+## Optinull
 
-Optinull is a small, clean-architecture **optimization engine written in C#** with a **Telegram bot** as its front end.
-
-You send a problem (a built-in benchmark, a random instance, or your own data) and pick an algorithm. Optinull solves it in the background and sends back the score plus charts: a Gantt chart for a schedule, a route map for a tour, a convergence curve showing how the search progressed.
-
-Its main purpose is to make heuristic solvers **easy to try and easy to compare**. Every solver runs against the same problem, with the same seed and the same evaluation budget, so the comparison is fair and reproducible.
-
-```text
-You:   /compare jobshop ft10
-Bot:   Running Greedy, Hill Climbing, Simulated Annealing, Genetic Algorithm ...
-Bot:   [comparison chart]  [convergence chart]  [Gantt chart]
-```
+Optinull is a small **optimization engine written in C#** with a **Telegram bot** as its interface. You send a problem (a built-in benchmark, a random instance, or your own data) and pick an algorithm (or all of them to compare). Optinull solves it in the background and sends back the score plus charts: a Gantt chart for a schedule, a route map for a tour, a convergence curve showing how the search progressed. The main purpose is to make heuristic solvers **easy to try and easy to compare**. Every solver runs against the same problem, with the same seed and the same evaluation budget, so the comparison is fair and reproducible.
 
 ## Features
 
