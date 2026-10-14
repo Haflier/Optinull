@@ -13,7 +13,7 @@ public sealed record OptimizeCommand : BotCommand;
 /// <summary>
 /// Target is a built-in instance name (ft06, circle20, ...) or a problem id
 /// (jobshop, tsp) when the instance text follows the command. CompareAll runs
-/// every solver and ignores Solver.
+/// every solver and ignores Solver. Tuning holds the solver settings the user changed.
 /// </summary>
 public sealed record SolveCommand(
     string Target,
@@ -22,7 +22,8 @@ public sealed record SolveCommand(
     int? Iterations = null,
     int? Seed = null,
     IReadOnlyDictionary<string, string>? Parameters = null,
-    bool CompareAll = false) : BotCommand
+    bool CompareAll = false,
+    SolverTuning? Tuning = null) : BotCommand
 {
     private static readonly IReadOnlyDictionary<string, string> None =
         new Dictionary<string, string>();

@@ -79,6 +79,17 @@ public sealed class BotCommandProcessor
                 "(default: solver's own setting)");
             text.AppendLine("seed - use the same seed to reproduce a result");
             text.AppendLine();
+            text.AppendLine("Tuning (with the matching algorithm, or all)");
+
+            foreach (var key in TuningCatalog.Keys)
+            {
+                text.AppendLine(
+                    $"{TuningCatalog.Code(key.Solver)} {key.Name}={TuningCatalog.Range(key)}, " +
+                    $"{key.Description} (default {key.Default})");
+            }
+
+            text.AppendLine("Example: /solve ft10 sa temperature=2 final=0.001");
+            text.AppendLine();
             text.AppendLine("Custom input");
             text.AppendLine(
                 "Provide the instance on the lines after /solve <problem> [solver],");

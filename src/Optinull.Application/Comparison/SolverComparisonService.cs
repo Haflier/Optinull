@@ -40,7 +40,7 @@ public sealed class SolverComparisonService
             segment.Complete();
         }
 
-        return Build(instance, outcomes);
+        return Build(instance, outcomes, options.Tuning);
     }
 
     public static SolverOutcome PickBest(IReadOnlyList<SolverOutcome> outcomes, bool higherIsBetter) =>
@@ -73,7 +73,10 @@ public sealed class SolverComparisonService
     private static bool AreEqual(double first, double second) =>
         Math.Abs(first - second) <= Math.Max(Math.Abs(second) * 1e-9, 1e-12);
 
-    private static SolveReport Build(IProblemInstance instance, IReadOnlyList<SolverOutcome> outcomes)
+    private static SolveReport Build(
+        IProblemInstance instance,
+        IReadOnlyList<SolverOutcome> outcomes,
+        SolverTuning? tuning)
     {
         var winners = PickWinners(outcomes, instance.HigherIsBetter);
 
@@ -95,7 +98,7 @@ public sealed class SolverComparisonService
 
         var images = new List<ReportImage>
         {
-            new($"{instance.Name}-compare.png", Table(instance, outcomes, winners), scoreChart),
+            new($"{instance.Name}-compare.png", Table(instance, outcomes, winners, tuning), scoreChart),
             new($"{instance.Name}-compare-convergence.png", "Convergence of every solver (Greedy builds a single solution, so it is a flat line)", convergence)
         };
 
@@ -124,7 +127,8 @@ public sealed class SolverComparisonService
     public static string Table(
         IProblemInstance instance,
         IReadOnlyList<SolverOutcome> outcomes,
-        IReadOnlyList<SolverOutcome> winners)
+        IReadOnlyList<SolverOutcome> winners,
+        SolverTuning? tuning = null)
     {
         var lines = new List<string> { $"{instance.Description} - {instance.ScoreLabel}:" };
 
@@ -167,6 +171,10 @@ public sealed class SolverComparisonService
 
             lines.Add($"Improvement over greedy: {improvement:P1}");
         }
+
+        // Each setting went to the solver it belongs to, so say which.
+        if (tuning is { IsEmpty: false })
+            lines.Add($"Settings: {tuning.Describe(tagSolvers: true)}");
 
         return string.Join("\n", lines);
     }

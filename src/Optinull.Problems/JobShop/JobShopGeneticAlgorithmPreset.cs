@@ -29,14 +29,19 @@ public static class JobShopGeneticAlgorithmPreset
 
     public static GeneticAlgorithm<JobSequence> CreateSolver(
         int maxEvaluations = DefaultMaxEvaluations,
-        IRandomSource? random = null) =>
+        IRandomSource? random = null,
+        int populationSize = PopulationSize,
+        int eliteCount = EliteCount,
+        double mutationRate = MutationRate,
+        int tournamentSize = TournamentSize,
+        int localSearchTries = LocalSearchTries) =>
         new(
-            populationSize: PopulationSize,
+            populationSize: populationSize,
             generations: 1_000_000,
-            eliteCount: EliteCount,
-            mutationRate: MutationRate,
-            tournamentSize: TournamentSize,
-            localSearchTries: LocalSearchTries,
+            eliteCount: eliteCount,
+            mutationRate: mutationRate,
+            tournamentSize: tournamentSize,
+            localSearchTries: localSearchTries,
             maxEvaluations: maxEvaluations,
             random: random);
 }

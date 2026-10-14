@@ -51,7 +51,8 @@ public sealed class JobExecutor
             var options = new SolveOptions(
                 job.Command.Seed ?? SolveOptions.DefaultSeed,
                 job.Command.Iterations,
-                progress);
+                progress,
+                job.Command.Tuning);
 
             var report = await Task.Run(
                 () => Solve(job, options, token),
@@ -95,6 +96,12 @@ public sealed class JobExecutor
                 // The host is shutting down.
                 job.MarkCancelled();
             }
+        }
+        catch (TuningException exception)
+        {
+            // Settings that cannot work together are the user's to fix, so say which.
+            job.Fail(exception.Message);
+            await TrySendAsync(job, $"Job #{job.Id} stopped: {exception.Message}");
         }
         catch (Exception exception)
         {

@@ -58,10 +58,10 @@ public static class ProblemInstanceExtensions
         return new SolveReport(
             outcome.SolverName,
             outcome.Render(),
-            Summary(instance, outcome));
+            Summary(instance, outcome, options.Tuning));
     }
 
-    private static string Summary(IProblemInstance instance, SolverOutcome outcome)
+    private static string Summary(IProblemInstance instance, SolverOutcome outcome, SolverTuning? tuning)
     {
         var text = $"Optimization completed.\n{instance.ScoreLabel}: {outcome.Score:0.##}";
 
@@ -74,6 +74,9 @@ public static class ProblemInstanceExtensions
 
             text += $"\nImprovement over greedy: {improvement:P1}";
         }
+
+        if (tuning is { IsEmpty: false })
+            text += $"\nSettings: {tuning.Describe()}";
 
         return text;
     }

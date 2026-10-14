@@ -16,18 +16,23 @@ public sealed record JobShopSolveResult(
 /// </summary>
 public sealed class JobShopSolveService
 {
+    /// <summary>The start temperature simulated annealing has always used here.</summary>
+    private const double UsualStartTemperature = 100.0;
+
     public JobShopSolveResult Solve(
         JobShopProblem problem,
         SolverKind kind = SolverKind.SimulatedAnnealing,
         int seed = SolveOptions.DefaultSeed,
         CancellationToken cancellationToken = default,
         int? iterations = null,
-        IProgress<double>? progress = null)
+        IProgress<double>? progress = null,
+        SolverTuning? tuning = null)
     {
         ArgumentNullException.ThrowIfNull(problem);
 
         var random = new RandomSource(seed);
         var budget = iterations ?? SolveOptions.DefaultBudget;
+        var tune = tuning ?? SolverTuning.None;
 
         string name;
         SearchResult<JobSequence> search;
@@ -55,7 +60,7 @@ public sealed class JobShopSolveService
             case SolverKind.IteratedLocalSearch:
                 name = SolverNames.Display(kind);
                 search = new IteratedLocalSearch<JobSequence>(
-                        perturbationSize: 3,
+                        perturbationSize: tune.Perturbation ?? 3,
                         iterationCount: int.MaxValue,
                         random: random,
                         maxEvaluations: budget)
@@ -66,10 +71,14 @@ public sealed class JobShopSolveService
                 break;
 
             case SolverKind.SimulatedAnnealing:
+                var sa = tune.Annealing(UsualStartTemperature);
+
                 name = SolverNames.Display(kind);
                 search = new SimulatedAnnealing<JobSequence>(
-                        coolingRate: AnnealingBudget.CoolingRate(iterations),
-                        iterationsPerTemperature: AnnealingBudget.IterationsPerTemperature,
+                        initialTemperature: sa.InitialTemperature,
+                        coolingRate: AnnealingBudget.CoolingRate(iterations, sa.Moves, sa.FinalRatio),
+                        iterationsPerTemperature: sa.Moves,
+                        minimumTemperature: sa.InitialTemperature * sa.FinalRatio,
                         random: random)
                     .Solve(
                         new ProgressTrackingProblem<JobSequence>(
@@ -78,9 +87,23 @@ public sealed class JobShopSolveService
                 break;
 
             case SolverKind.GeneticAlgorithm:
+                var ga = tune.Genetic(
+                    JobShopGeneticAlgorithmPreset.PopulationSize,
+                    JobShopGeneticAlgorithmPreset.EliteCount,
+                    JobShopGeneticAlgorithmPreset.MutationRate,
+                    JobShopGeneticAlgorithmPreset.TournamentSize,
+                    JobShopGeneticAlgorithmPreset.LocalSearchTries);
+
                 name = SolverNames.Display(kind);
                 search = JobShopGeneticAlgorithmPreset
-                    .CreateSolver(budget, random)
+                    .CreateSolver(
+                        budget,
+                        random,
+                        ga.Population,
+                        ga.Elite,
+                        ga.Mutation,
+                        ga.Tournament,
+                        ga.LocalSearch)
                     .Solve(
                         new ProgressTrackingProblem<JobSequence>(
                             JobShopGeneticAlgorithmPreset.CreateProblem(problem), budget, progress),

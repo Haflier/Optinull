@@ -26,12 +26,14 @@ public sealed class KnapsackSolveService
         int seed = SolveOptions.DefaultSeed,
         CancellationToken cancellationToken = default,
         int? iterations = null,
-        IProgress<double>? progress = null)
+        IProgress<double>? progress = null,
+        SolverTuning? tuning = null)
     {
         ArgumentNullException.ThrowIfNull(problem);
 
         var searchProblem = new KnapsackSearchProblem(problem);
         var random = new RandomSource(seed);
+        var tune = tuning ?? SolverTuning.None;
 
         var budgeted = kind is SolverKind.SimulatedAnnealing
             or SolverKind.GeneticAlgorithm
@@ -63,7 +65,7 @@ public sealed class KnapsackSolveService
             case SolverKind.IteratedLocalSearch:
                 name = SolverNames.Display(kind);
                 search = new IteratedLocalSearch<KnapsackSelection>(
-                        perturbationSize: 3,
+                        perturbationSize: tune.Perturbation ?? 3,
                         iterationCount: int.MaxValue,
                         random: random,
                         maxEvaluations: iterations ?? EvaluationBudget)
@@ -75,26 +77,30 @@ public sealed class KnapsackSolveService
                 // A move changes the value by about one item's value, so start there.
                 var start = Math.Max(1.0, problem.Items.Average(item => (double)item.Value));
 
+                var sa = tune.Annealing(start);
+
                 name = SolverNames.Display(kind);
                 search = new SimulatedAnnealing<KnapsackSelection>(
-                        initialTemperature: start,
-                        coolingRate: AnnealingBudget.CoolingRate(iterations),
-                        iterationsPerTemperature: AnnealingBudget.IterationsPerTemperature,
-                        minimumTemperature: start * 1e-5,
+                        initialTemperature: sa.InitialTemperature,
+                        coolingRate: AnnealingBudget.CoolingRate(iterations, sa.Moves, sa.FinalRatio),
+                        iterationsPerTemperature: sa.Moves,
+                        minimumTemperature: sa.InitialTemperature * sa.FinalRatio,
                         random: random)
                     .Solve(tracked, cancellationToken);
                 break;
             }
 
             case SolverKind.GeneticAlgorithm:
+                var ga = tune.Genetic(50, 2, 0.2, 3, 10);
+
                 name = SolverNames.Display(kind);
                 search = new GeneticAlgorithm<KnapsackSelection>(
-                        populationSize: 50,
+                        populationSize: ga.Population,
                         generations: 1_000_000,
-                        eliteCount: 2,
-                        mutationRate: 0.2,
-                        tournamentSize: 3,
-                        localSearchTries: 10,
+                        eliteCount: ga.Elite,
+                        mutationRate: ga.Mutation,
+                        tournamentSize: ga.Tournament,
+                        localSearchTries: ga.LocalSearch,
                         maxEvaluations: iterations ?? EvaluationBudget,
                         random: random)
                     .Solve(tracked, cancellationToken);

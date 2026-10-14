@@ -6,7 +6,8 @@ namespace Optinull.Application.Commands;
 public static class BotCommandParser
 {
     public const string Usage =
-        "Usage: /solve <problem> [greedy|hc|ils|sa|ga|all] [iterations=N] [seed=N] [key=value ...]";
+        "Usage: /solve <problem> [greedy|hc|ils|sa|ga|all] [iterations=N] [seed=N] " +
+        "[tuning key=value ...] [key=value ...]";
 
     private static readonly HashSet<string> IterationKeys =
         new(["iterations", "iteration", "iter", "it"], StringComparer.OrdinalIgnoreCase);
@@ -71,6 +72,7 @@ public static class BotCommandParser
         int? iterations = null;
         int? seed = null;
         var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var tuningValues = new Dictionary<string, string>();
 
         foreach (var token in parts.Skip(2))
         {
@@ -140,11 +142,19 @@ public static class BotCommandParser
 
                 seed = s;
             }
+            else if (TuningCatalog.Canonical(key) is { } tuningKey)
+            {
+                if (!tuningValues.TryAdd(tuningKey, value))
+                    return new InvalidCommand($"{tuningKey} was given twice.");
+            }
             else if (!parameters.TryAdd(key, value))
             {
                 return new InvalidCommand($"{key} was given twice.");
             }
         }
+
+        if (!TuningCatalog.TryBuild(tuningValues, solver, compare, out var tuning, out var tuningError))
+            return new InvalidCommand(tuningError!);
 
         return new SolveCommand(
             parts[1].ToLowerInvariant(),
@@ -153,7 +163,8 @@ public static class BotCommandParser
             iterations,
             seed,
             parameters.Count == 0 ? null : parameters,
-            compare);
+            compare,
+            tuning);
     }
 
     private static bool IsCompareToken(string token) =>

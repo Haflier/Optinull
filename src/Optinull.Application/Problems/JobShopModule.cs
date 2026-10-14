@@ -155,7 +155,8 @@ internal sealed class JobShopInstance : IProblemInstance
             options.Seed,
             cancellationToken,
             options.Iterations,
-            options.Progress);
+            options.Progress,
+            options.Tuning);
 
         return new SolverOutcome(
             solver,

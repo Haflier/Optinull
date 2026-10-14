@@ -16,7 +16,8 @@ public static class SolveLimits
 public sealed record SolveOptions(
     int Seed = SolveOptions.DefaultSeed,
     int? Iterations = null,
-    IProgress<double>? Progress = null)
+    IProgress<double>? Progress = null,
+    SolverTuning? Tuning = null)
 {
     public const int DefaultSeed = 42;
 
@@ -31,8 +32,10 @@ internal static class AnnealingBudget
 
     private const double DefaultCoolingRate = 0.95;
 
-    // Both solvers cool until the temperature is this fraction of the start.
-    private const double TemperatureRatio = 1e-5;
+    /// <summary>The solvers cool until the temperature is this fraction of the start.</summary>
+    public const double DefaultFinalRatio = 1e-5;
+
+    private const double TemperatureRatio = DefaultFinalRatio;
 
     public static double CoolingRate(int? iterations)
     {
@@ -42,5 +45,21 @@ internal static class AnnealingBudget
         var steps = Math.Max(1, budget / IterationsPerTemperature);
 
         return Math.Pow(TemperatureRatio, 1.0 / steps);
+    }
+
+    /// <summary>
+    /// The cooling rate for a user-chosen schedule. The budget still decides how long the
+    /// run is: it holds budget / moves temperature levels, ending at the final fraction.
+    /// </summary>
+    public static double CoolingRate(int? iterations, int moves, double finalRatio)
+    {
+        // The default schedule keeps its exact, long-standing rate.
+        if (iterations is null && moves == IterationsPerTemperature && finalRatio == DefaultFinalRatio)
+            return DefaultCoolingRate;
+
+        var budget = iterations ?? SolveOptions.DefaultBudget;
+        var steps = Math.Max(1, budget / moves);
+
+        return Math.Pow(finalRatio, 1.0 / steps);
     }
 }

@@ -18,7 +18,21 @@
 
 ## Optinull
 
+<<<<<<< HEAD
 Optinull is a small **optimization engine written in C#** with a **Telegram bot** as its interface. You send a problem (a built-in benchmark, a random instance, or your own data) and pick an algorithm (or all of them to compare). Optinull solves it in the background and sends back the score plus charts: a Gantt chart for a schedule, a route map for a tour, a convergence curve showing how the search progressed. The main purpose is to make heuristic solvers **easy to try and easy to compare**. Every solver runs against the same problem, with the same seed and the same evaluation budget, so the comparison is fair and reproducible.
+=======
+Optinull is a small, clean-architecture **optimization engine written in C#** with a **Telegram bot** as its front end.
+
+You send a problem (a built-in benchmark, a random instance, or your own data) and pick an algorithm. Optinull solves it in the background and sends back the score plus charts: a Gantt chart for a schedule, a route map for a tour, a convergence curve showing how the search progressed.
+
+Its main purpose is to make heuristic solvers **easy to try and easy to compare**. Every solver runs against the same problem, with the same seed and the same evaluation budget, so the comparison is fair and reproducible.
+
+```text
+You:   /compare ft10
+Bot:   Running Greedy, Hill Climbing, Iterated Local Search, Simulated Annealing, Genetic Algorithm ...
+Bot:   [comparison chart]  [convergence chart]  [Gantt chart]
+```
+>>>>>>> 2dce477 ([feat] apply solver tuning(temperature, population size, mutation rate, ...) and fix ils test)
 
 ## Features
 
@@ -94,8 +108,8 @@ Open your bot in Telegram and send `/start`.
 | Command | What it does |
 |---|---|
 | `/optimize` | Guided flow with buttons: **Problem → Dataset → Algorithm**. Choose *Custom* to enter your own data step by step |
-| `/solve <problem> [solver] [iterations=N] [seed=N] [key=value ...]` | Solve one problem directly |
-| `/compare <problem> [iterations=N] [seed=N] [key=value ...]` | Run every algorithm on the same problem |
+| `/solve <problem> [solver] [iterations=N] [seed=N] [tuning ...] [key=value ...]` | Solve one problem directly |
+| `/compare <problem> [iterations=N] [seed=N] [tuning ...] [key=value ...]` | Run every algorithm on the same problem |
 | `/cancel` | Stop your current job |
 | `/help` | List commands, built-in instances and input formats |
 
@@ -112,7 +126,38 @@ Open your bot in Telegram and send `/start`.
 /solve tsp cities=30 sa seed=7      # Random 30-city instance, reproducible
 /compare knapsack items=50          # Every solver on a random knapsack
 /compare random50                   # Every solver on a built-in TSP instance
+/solve ft10 sa temperature=2        # A hotter annealing start (see Tuning the solvers)
 ```
+
+### Tuning the solvers
+
+Solver settings are plain `key=value` words next to `iterations` and `seed`. Each one belongs to a single algorithm. With `all` or `/compare`, every setting goes to its own algorithm. A setting for the wrong algorithm is rejected with a message that says which one it tunes.
+
+| Algorithm | Key | Range | Default | Meaning |
+|---|---|---|---|---|
+| `sa` | `temperature` | 0.01 - 100 | 1 | Start temperature, as a multiple of the problem's usual start (see below) |
+| `sa` | `final` | 1e-8 - 0.5 | 0.00001 | End temperature as a fraction of the start |
+| `sa` | `moves` | 1 - 10000 | 90 | Moves tried at each temperature |
+| `ga` | `population` | 2 - 500 | 50 (job shop 30) | Individuals per generation |
+| `ga` | `mutation` | 0 - 1 | 0.2 | Chance that a child is mutated |
+| `ga` | `elite` | 0 - 100 | 2 | Best individuals copied unchanged (at most `population`) |
+| `ga` | `tournament` | 1 - 50 | 3 | Contestants per parent choice (at most `population`) |
+| `ga` | `localsearch` | 0 - 200 | 10 (job shop 30) | Local search tries per child |
+| `ils` | `perturbation` | 1 - 50 | 3 | Random moves between restarts |
+
+Short forms work too: `temp`, `end`, `pop`, `mut`, `ls`, `perturb`.
+
+```text
+/solve ft10 sa temperature=2 final=0.001
+/solve tsp cities=50 ga population=100 mutation=0.3 iterations=20000
+/compare knapsack items=60 temperature=0.5 mutation=0.1
+```
+
+**Why the temperature is relative.** Tour lengths, makespans and knapsack values live on very different scales, so one absolute temperature would be far too hot for one problem and far too cold for another. `temperature=1` is the problem's own usual starting point (for a TSP the average edge of the nearest-neighbour tour, for a knapsack the average item value, for a job shop 100), so `temperature=2` means "twice as hot" on every problem. The schedule still fits the evaluation budget: `iterations` decides the length, `moves` how many temperature levels that makes, and `final` where it ends.
+
+Results list the settings that were changed, so a run can be reproduced from the chat.
+
+**A limit of Iterated Local Search.** It finishes its first climb to a local optimum before it looks at the budget. On a large instance with a small `iterations` that climb already uses everything, so no restart happens and `perturbation` has no effect. Give it a budget with room for several climbs.
 
 ### Custom input
 
