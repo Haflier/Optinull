@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/optinull-logo.png" alt="Optinull" width="600">
+  <img src="docs/images/optinull-logo.webp" alt="Optinull" width="600">
 </p>
 
 <p align="center">
