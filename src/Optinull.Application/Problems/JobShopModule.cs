@@ -165,7 +165,8 @@ internal sealed class JobShopInstance : IProblemInstance
             result.Search.Elapsed,
             result.Search.EvaluationCount,
             ReportMapper.ToConvergenceSeries(result.SolverName, result.Search),
-            () => RenderImages(result));
+            () => RenderImages(result),
+            Settings: result.Settings);
     }
 
     private IReadOnlyList<ReportImage> RenderImages(JobShopSolveResult result)

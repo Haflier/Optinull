@@ -168,7 +168,8 @@ internal sealed class TspInstance : IProblemInstance
             result.Search.EvaluationCount,
             ReportMapper.ToConvergenceSeries(result.SolverName, result.Search),
             () => RenderImages(result),
-            Baseline: result.GreedyLength);
+            Baseline: result.GreedyLength,
+            Settings: result.Settings);
     }
 
     private IReadOnlyList<ReportImage> RenderImages(TspSolveResult result)

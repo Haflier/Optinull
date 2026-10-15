@@ -10,7 +10,8 @@ public sealed record KnapsackSolveResult(
     long Value,
     long Weight,
     double GreedyValue,
-    SearchResult<KnapsackSelection> Search);
+    SearchResult<KnapsackSelection> Search,
+    string? Settings = null);
 
 /// <summary>
 /// Solves a knapsack with the chosen solver at a fixed evaluation budget. The settings
@@ -48,6 +49,7 @@ public sealed class KnapsackSolveService
             .ObjectiveValue;
 
         string name;
+        string? settings = null;
         SearchResult<KnapsackSelection> search;
 
         switch (kind)
@@ -63,9 +65,12 @@ public sealed class KnapsackSolveService
                 break;
 
             case SolverKind.IteratedLocalSearch:
+                var perturb = tune.PerturbationFor(problem.ItemCount);
+
+                settings = perturb.Applied;
                 name = SolverNames.Display(kind);
                 search = new IteratedLocalSearch<KnapsackSelection>(
-                        perturbationSize: tune.Perturbation ?? 3,
+                        perturbationSize: perturb.Size,
                         iterationCount: int.MaxValue,
                         random: random,
                         maxEvaluations: iterations ?? EvaluationBudget)
@@ -77,7 +82,9 @@ public sealed class KnapsackSolveService
                 // A move changes the value by about one item's value, so start there.
                 var start = Math.Max(1.0, problem.Items.Average(item => (double)item.Value));
 
-                var sa = tune.Annealing(start);
+                var sa = tune.Annealing(start, iterations ?? EvaluationBudget);
+
+                settings = sa.Applied;
 
                 name = SolverNames.Display(kind);
                 search = new SimulatedAnnealing<KnapsackSelection>(
@@ -91,7 +98,9 @@ public sealed class KnapsackSolveService
             }
 
             case SolverKind.GeneticAlgorithm:
-                var ga = tune.Genetic(50, 2, 0.2, 3, 10);
+                var ga = tune.Genetic(50, 0.2, 3, 10, iterations ?? EvaluationBudget);
+
+                settings = ga.Applied;
 
                 name = SolverNames.Display(kind);
                 search = new GeneticAlgorithm<KnapsackSelection>(
@@ -112,6 +121,6 @@ public sealed class KnapsackSolveService
 
         var (value, weight) = KnapsackEvaluator.Totals(problem, search.Best);
 
-        return new KnapsackSolveResult(name, search.Best, value, weight, greedyValue, search);
+        return new KnapsackSolveResult(name, search.Best, value, weight, greedyValue, search, settings);
     }
 }

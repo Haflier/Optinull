@@ -150,7 +150,8 @@ internal sealed class KnapsackInstance : IProblemInstance
             result.Search.EvaluationCount,
             ReportMapper.ToConvergenceSeries(result.SolverName, result.Search),
             () => RenderImages(result),
-            Baseline: result.GreedyValue);
+            Baseline: result.GreedyValue,
+            Settings: result.Settings);
     }
 
     private IReadOnlyList<ReportImage> RenderImages(KnapsackSolveResult result)

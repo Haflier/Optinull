@@ -68,54 +68,118 @@ public sealed record SolverTuning
         return string.Join(", ", parts);
     }
 
-    /// <summary>The annealing schedule: the problem's usual start, scaled by the user's temperature.</summary>
-    internal AnnealingSettings Annealing(double usualStartTemperature) =>
-        new(
-            usualStartTemperature * (Temperature ?? 1.0),
-            Moves ?? AnnealingBudget.IterationsPerTemperature,
-            Final ?? AnnealingBudget.DefaultFinalRatio);
+    // ---- Automatic settings -------------------------------------------------------------
+    // Whatever the user did not set is chosen here from the problem and the budget, and
+    // whatever the user did set is used as given. The rules are written so that at the
+    // default budget they give the same values the solvers have always had.
 
-    /// <summary>The genetic settings, with the problem's defaults for whatever was not changed.</summary>
+    /// <summary>Temperature levels the default schedule has: ln(1e-5) / ln(0.95), rounded.</summary>
+    private const double DefaultTemperatureLevels = 222.0;
+
+    /// <summary>
+    /// Generations the genetic algorithm should at least get, so a small budget is not
+    /// spent on evaluating a population that never has time to evolve.
+    /// </summary>
+    private const int MinimumGenerations = 20;
+
+    /// <summary>Simulated annealing: the problem's usual start scaled by the user's temperature.</summary>
+    internal AnnealingSettings Annealing(double usualStartTemperature, int budget)
+    {
+        // The same number of temperature levels at any budget (the default schedule has
+        // about 222), so a small budget gets few moves per level and a large one many.
+        var autoMoves = Math.Clamp((int)Math.Round(budget / DefaultTemperatureLevels), 5, 1000);
+
+        var moves = Moves ?? autoMoves;
+        var final = Final ?? AnnealingBudget.DefaultFinalRatio;
+
+        return new AnnealingSettings(
+            usualStartTemperature * (Temperature ?? 1.0),
+            moves,
+            final,
+            string.Join(", ", new[]
+            {
+                Mark("temperature", Temperature ?? 1.0, Temperature is not null),
+                Mark("final", final, Final is not null),
+                Mark("moves", moves, Moves is not null)
+            }));
+    }
+
+    /// <summary>
+    /// The genetic settings. The problem supplies its own defaults; the population is shrunk
+    /// for a small budget, and the elite and tournament follow the population.
+    /// </summary>
     internal GeneticSettings Genetic(
         int defaultPopulation,
-        int defaultElite,
         double defaultMutation,
         int defaultTournament,
-        int defaultLocalSearch)
+        int defaultLocalSearch,
+        int budget)
     {
-        var settings = new GeneticSettings(
-            Population ?? defaultPopulation,
-            Elite ?? defaultElite,
-            Mutation ?? defaultMutation,
-            Tournament ?? defaultTournament,
-            LocalSearch ?? defaultLocalSearch);
+        var localSearch = LocalSearch ?? defaultLocalSearch;
 
-        // These depend on each other, and the defaults differ per problem, so they can only be
-        // checked here.
-        if (settings.Elite > settings.Population)
-        {
-            throw new TuningException(
-                $"elite ({settings.Elite}) cannot be more than population ({settings.Population}).");
-        }
+        // A child costs one evaluation plus its local search tries.
+        var affordable = budget / (MinimumGenerations * (localSearch + 1));
 
-        if (settings.Tournament > settings.Population)
-        {
-            throw new TuningException(
-                $"tournament ({settings.Tournament}) cannot be more than population ({settings.Population}).");
-        }
+        var population = Population ?? Math.Clamp(affordable, Math.Min(10, defaultPopulation), defaultPopulation);
+        var elite = Elite ?? Math.Min(population, Math.Max(2, population / 25));
+        var tournament = Tournament ?? Math.Min(defaultTournament, population);
+        var mutation = Mutation ?? defaultMutation;
 
-        return settings;
+        // These depend on each other, and the automatic values differ per problem and budget,
+        // so they can only be checked here.
+        if (elite > population)
+            throw new TuningException($"elite ({elite}) cannot be more than population ({population}).");
+
+        if (tournament > population)
+            throw new TuningException($"tournament ({tournament}) cannot be more than population ({population}).");
+
+        return new GeneticSettings(
+            population,
+            elite,
+            mutation,
+            tournament,
+            localSearch,
+            string.Join(", ", new[]
+            {
+                Mark("population", population, Population is not null),
+                Mark("elite", elite, Elite is not null),
+                Mark("mutation", mutation, Mutation is not null),
+                Mark("tournament", tournament, Tournament is not null),
+                Mark("localsearch", localSearch, LocalSearch is not null)
+            }));
     }
+
+    /// <summary>
+    /// Iterated local search: roughly one random move per 20 parts of the problem, between
+    /// 3 and 8. Every benchmark up to about 60 parts keeps the long-standing 3.
+    /// </summary>
+    internal PerturbationSettings PerturbationFor(int problemSize)
+    {
+        var size = Perturbation ?? Math.Clamp((int)Math.Round(problemSize / 20.0), 3, 8);
+
+        return new PerturbationSettings(size, Mark("perturbation", size, Perturbation is not null));
+    }
+
+    private static string Mark(string name, double value, bool chosenByUser) =>
+        $"{name}={value.ToString("0.########", CultureInfo.InvariantCulture)} " +
+        (chosenByUser ? "(yours)" : "(auto)");
 }
 
-internal readonly record struct AnnealingSettings(double InitialTemperature, int Moves, double FinalRatio);
+internal readonly record struct AnnealingSettings(
+    double InitialTemperature,
+    int Moves,
+    double FinalRatio,
+    string Applied);
 
 internal readonly record struct GeneticSettings(
     int Population,
     int Elite,
     double Mutation,
     int Tournament,
-    int LocalSearch);
+    int LocalSearch,
+    string Applied);
+
+internal readonly record struct PerturbationSettings(int Size, string Applied);
 
 /// <summary>One setting of a solver, for parsing, validation and the help text.</summary>
 public sealed record TuningKey(

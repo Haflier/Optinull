@@ -9,7 +9,8 @@ public sealed record TspSolveResult(
     TspTour Tour,
     double Length,
     double GreedyLength,
-    SearchResult<TspTour> Search);
+    SearchResult<TspTour> Search,
+    string? Settings = null);
 
 /// <summary>
 /// Solves a TSP with the chosen solver at a fixed evaluation budget. The settings
@@ -49,6 +50,7 @@ public sealed class TspSolveService
             .ObjectiveValue;
 
         string name;
+        string? settings = null;
         SearchResult<TspTour> search;
 
         switch (kind)
@@ -64,9 +66,12 @@ public sealed class TspSolveService
                 break;
 
             case SolverKind.IteratedLocalSearch:
+                var perturb = tune.PerturbationFor(problem.CityCount);
+
+                settings = perturb.Applied;
                 name = SolverNames.Display(kind);
                 search = new IteratedLocalSearch<TspTour>(
-                        perturbationSize: tune.Perturbation ?? 3,
+                        perturbationSize: perturb.Size,
                         iterationCount: int.MaxValue,
                         random: random,
                         maxEvaluations: iterations ?? EvaluationBudget)
@@ -82,7 +87,9 @@ public sealed class TspSolveService
                 if (start <= 0)
                     start = 1;
 
-                var sa = tune.Annealing(start);
+                var sa = tune.Annealing(start, iterations ?? EvaluationBudget);
+
+                settings = sa.Applied;
 
                 name = SolverNames.Display(kind);
                 search = new SimulatedAnnealing<TspTour>(
@@ -96,7 +103,9 @@ public sealed class TspSolveService
             }
 
             case SolverKind.GeneticAlgorithm:
-                var ga = tune.Genetic(50, 2, 0.2, 3, 10);
+                var ga = tune.Genetic(50, 0.2, 3, 10, iterations ?? EvaluationBudget);
+
+                settings = ga.Applied;
 
                 name = SolverNames.Display(kind);
                 search = new GeneticAlgorithm<TspTour>(
@@ -120,6 +129,7 @@ public sealed class TspSolveService
             search.Best,
             search.Evaluation.ObjectiveValue,
             greedyLength,
-            search);
+            search,
+            settings);
     }
 }

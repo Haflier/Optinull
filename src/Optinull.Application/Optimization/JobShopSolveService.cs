@@ -8,7 +8,8 @@ public sealed record JobShopSolveResult(
     string SolverName,
     JobShopSchedule Schedule,
     double Makespan,
-    SearchResult<JobSequence> Search);
+    SearchResult<JobSequence> Search,
+    string? Settings = null);
 
 /// <summary>
 /// Solves a job shop with the chosen solver. Simulated annealing is the
@@ -35,6 +36,7 @@ public sealed class JobShopSolveService
         var tune = tuning ?? SolverTuning.None;
 
         string name;
+        string? settings = null;
         SearchResult<JobSequence> search;
 
         switch (kind)
@@ -58,9 +60,12 @@ public sealed class JobShopSolveService
                 break;
 
             case SolverKind.IteratedLocalSearch:
+                var perturb = tune.PerturbationFor(problem.Jobs.Sum(job => job.Operations.Count));
+
+                settings = perturb.Applied;
                 name = SolverNames.Display(kind);
                 search = new IteratedLocalSearch<JobSequence>(
-                        perturbationSize: tune.Perturbation ?? 3,
+                        perturbationSize: perturb.Size,
                         iterationCount: int.MaxValue,
                         random: random,
                         maxEvaluations: budget)
@@ -71,7 +76,9 @@ public sealed class JobShopSolveService
                 break;
 
             case SolverKind.SimulatedAnnealing:
-                var sa = tune.Annealing(UsualStartTemperature);
+                var sa = tune.Annealing(UsualStartTemperature, budget);
+
+                settings = sa.Applied;
 
                 name = SolverNames.Display(kind);
                 search = new SimulatedAnnealing<JobSequence>(
@@ -89,10 +96,12 @@ public sealed class JobShopSolveService
             case SolverKind.GeneticAlgorithm:
                 var ga = tune.Genetic(
                     JobShopGeneticAlgorithmPreset.PopulationSize,
-                    JobShopGeneticAlgorithmPreset.EliteCount,
                     JobShopGeneticAlgorithmPreset.MutationRate,
                     JobShopGeneticAlgorithmPreset.TournamentSize,
-                    JobShopGeneticAlgorithmPreset.LocalSearchTries);
+                    JobShopGeneticAlgorithmPreset.LocalSearchTries,
+                    budget);
+
+                settings = ga.Applied;
 
                 name = SolverNames.Display(kind);
                 search = JobShopGeneticAlgorithmPreset
@@ -120,6 +129,7 @@ public sealed class JobShopSolveService
             name,
             schedule,
             search.Evaluation.ObjectiveValue,
-            search);
+            search,
+            settings);
     }
 }

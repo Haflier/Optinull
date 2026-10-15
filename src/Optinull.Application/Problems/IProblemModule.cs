@@ -24,7 +24,8 @@ public sealed record SolverOutcome(
     int Evaluations,
     ConvergenceSeries Convergence,
     Func<IReadOnlyList<ReportImage>> Render,
-    double? Baseline = null);
+    double? Baseline = null,
+    string? Settings = null);
 
 /// <summary>One concrete problem that can solve itself and describe the result.</summary>
 public interface IProblemInstance
@@ -58,10 +59,10 @@ public static class ProblemInstanceExtensions
         return new SolveReport(
             outcome.SolverName,
             outcome.Render(),
-            Summary(instance, outcome, options.Tuning));
+            Summary(instance, outcome));
     }
 
-    private static string Summary(IProblemInstance instance, SolverOutcome outcome, SolverTuning? tuning)
+    private static string Summary(IProblemInstance instance, SolverOutcome outcome)
     {
         var text = $"Optimization completed.\n{instance.ScoreLabel}: {outcome.Score:0.##}";
 
@@ -75,8 +76,10 @@ public static class ProblemInstanceExtensions
             text += $"\nImprovement over greedy: {improvement:P1}";
         }
 
-        if (tuning is { IsEmpty: false })
-            text += $"\nSettings: {tuning.Describe()}";
+        // Everything the solver used: what the engine chose for this problem is marked (auto),
+        // and what the user set is marked (yours).
+        if (!string.IsNullOrEmpty(outcome.Settings))
+            text += $"\nSettings: {outcome.Settings}";
 
         return text;
     }
