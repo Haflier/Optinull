@@ -31,7 +31,7 @@ Optinull is an optimization engine written in C# / .NET with a Telegram bot as i
 - **Comparable runs:** compare solvers on the same instance with the same seed and evaluation budget.
 - **Reproducible experiments:** specify a seed; the default is `42`.
 - **Interactive and direct workflows:** use `/optimize` for a guided flow or `/solve` for command-driven runs.
-- **Configurable solvers:** tune simulated annealing, genetic algorithm, and iterated local search from chat.
+- **Automatic solver tuning:** choose problem- and budget-dependent settings for Simulated Annealing, Genetic Algorithm, and Iterated Local Search, with chat parameters available to override them.
 - **Visual results:** convergence and comparison charts, job-shop schedules, TSP routes, and knapsack selections.
 - **Bounded execution:** queued jobs, one active job per chat, cancellation, input limits, and a 60-second job timeout.
 

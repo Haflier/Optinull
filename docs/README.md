@@ -198,19 +198,29 @@ Custom input supports up to 100 items, capacity up to 100,000, item values up to
 
 Tuning values are written as `key=value` tokens alongside `iterations`, `seed`, and problem parameters. The value ranges are validated by the command parser. A tuning key belongs to one solver; for a single-solver command, specify that solver explicitly when required. With `/compare` or `all`, each setting is applied only to its corresponding solver.
 
+### Automatic tuning and overrides
+
+For Simulated Annealing (`sa`), Genetic Algorithm (`ga`), and Iterated Local Search (`ils`), Optinull selects tuning values automatically based on the problem and evaluation budget. You do not need to supply every tuning parameter.
+
+An explicitly supplied setting overrides the automatically selected value for that setting; other settings remain automatic. For example, `population=100` overrides the Genetic Algorithm's population size without requiring you to specify its mutation rate, elite count, or other settings. During `/compare` or `/solve ... all`, a setting is routed only to the solver it belongs to.
+
+The result summary reports the effective tuning settings and distinguishes automatic values from user-specified overrides. This makes the configuration of a run visible when reviewing or comparing results. Automatic tuning is a starting configuration, not a guarantee that a solver will find an optimal solution.
+
 ### Settings reference
 
-| Solver | Key | Alias | Range | Default | Meaning |
-|---|---|---|---:|---:|---|
-| Simulated Annealing (`sa`) | `temperature` | `temp` | 0.01–100 | 1 | Multiplier for the problem's usual initial temperature |
-| `sa` | `final` | `end` | 0.00000001–0.5 | 0.00001 | Final temperature as a fraction of the initial temperature |
-| `sa` | `moves` | — | 1–10,000 | 90 | Moves tried at each temperature level |
-| Genetic Algorithm (`ga`) | `population` | `pop` | 2–500 | 50; job shop 30 | Population size |
-| `ga` | `mutation` | `mut` | 0–1 | 0.2 | Probability that a child is mutated |
-| `ga` | `elite` | — | 0–100 | 2 | Number of best individuals retained unchanged; cannot exceed population |
-| `ga` | `tournament` | — | 1–50 | 3 | Number of candidates in a parent-selection tournament; cannot exceed population |
-| `ga` | `localsearch` | `ls` | 0–200 | 10; job shop 30 | Local-search attempts per child |
-| Iterated Local Search (`ils`) | `perturbation` | `perturb` | 1–50 | 3 | Number of random moves used to perturb a solution between local-search phases |
+The ranges below describe accepted user-supplied values. Effective automatic values can differ by problem and evaluation budget, so they are not fixed defaults.
+
+| Solver | Key | Alias | Range | Meaning |
+|---|---|---|---:|---|
+| Simulated Annealing (`sa`) | `temperature` | `temp` | 0.01–100 | Multiplier for the problem's usual initial temperature |
+| `sa` | `final` | `end` | 0.00000001–0.5 | Final temperature as a fraction of the initial temperature |
+| `sa` | `moves` | — | 1–10,000 | Moves tried at each temperature level |
+| Genetic Algorithm (`ga`) | `population` | `pop` | 2–500 | Population size |
+| `ga` | `mutation` | `mut` | 0–1 | Probability that a child is mutated |
+| `ga` | `elite` | — | 0–100 | Number of best individuals retained unchanged; cannot exceed population |
+| `ga` | `tournament` | — | 1–50 | Number of candidates in a parent-selection tournament; cannot exceed population |
+| `ga` | `localsearch` | `ls` | 0–200 | Local-search attempts per child |
+| Iterated Local Search (`ils`) | `perturbation` | `perturb` | 1–50 | Number of random moves used to perturb a solution between local-search phases |
 
 The `elite` and `tournament` values must also be valid relative to `population`. For example, `population=10 tournament=20` is rejected even though both values individually fit their documented ranges.
 
