@@ -206,13 +206,15 @@ public sealed class TuningSolveTests
     {
         var tuning = new SolverTuning { Elite = 40 };
 
-        // The job shop's default population is 30, the TSP's is 50.
-        Assert.Throws<TuningException>(() =>
+        // At the default budget the job shop's population is 30 and the TSP's is 50.
+        var error = Assert.Throws<TuningException>(() =>
             new JobShopSolveService().Solve(
-                JobShopBenchmarkInstances.Ft06(), SolverKind.GeneticAlgorithm, iterations: 500, tuning: tuning));
+                JobShopBenchmarkInstances.Ft06(), SolverKind.GeneticAlgorithm, tuning: tuning));
+
+        Assert.Equal("elite (40) cannot be more than population (30).", error.Message);
 
         var result = new TspSolveService().Solve(
-            TspBenchmarkInstances.RandomCities(15, seed: 1), SolverKind.GeneticAlgorithm, iterations: 500, tuning: tuning);
+            TspBenchmarkInstances.RandomCities(15, seed: 1), SolverKind.GeneticAlgorithm, tuning: tuning);
 
         Assert.True(result.Length > 0);
     }

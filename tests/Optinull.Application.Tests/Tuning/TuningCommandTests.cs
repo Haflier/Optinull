@@ -19,20 +19,39 @@ public sealed class TuningCommandTests
     }
 
     [Fact]
-    public async Task ASingleRun_ReportsTheSettingsItUsed()
+    public async Task ASingleRun_ReportsEverySettingItUsed_MarkingWhoChoseIt()
     {
         var (job, replies) = await QueueAsync("/solve knap20 sa iterations=1000 temperature=2 final=0.001");
 
         await new JobExecutor().ExecuteAsync(job);
 
         Assert.Equal(JobStatus.Completed, job.Status);
-        Assert.Contains("Settings: temperature=2, final=0.001", replies.Texts[^1]);
+
+        var summary = replies.Texts[^1];
+
+        Assert.Contains("temperature=2 (yours)", summary);
+        Assert.Contains("final=0.001 (yours)", summary);
+        Assert.Contains("moves=5 (auto)", summary);
     }
 
     [Fact]
-    public async Task ARunWithoutSettings_HasNoSettingsLine()
+    public async Task ARunWithoutSettings_StillShowsWhatTheEngineChose()
     {
-        var (job, replies) = await QueueAsync("/solve knap20 sa iterations=1000");
+        var (job, replies) = await QueueAsync("/solve knap20 ga iterations=2000");
+
+        await new JobExecutor().ExecuteAsync(job);
+
+        var summary = replies.Texts[^1];
+
+        Assert.Contains("Settings: population=", summary);
+        Assert.Contains("(auto)", summary);
+        Assert.DoesNotContain("(yours)", summary);
+    }
+
+    [Fact]
+    public async Task GreedyAndHillClimbing_HaveNoSettingsToShow()
+    {
+        var (job, replies) = await QueueAsync("/solve knap20 greedy");
 
         await new JobExecutor().ExecuteAsync(job);
 
