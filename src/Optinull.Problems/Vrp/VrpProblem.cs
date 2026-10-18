@@ -10,15 +10,15 @@ public readonly record struct VrpCustomer(double X, double Y, int Demand);
 public sealed class VrpProblem
 {
     private readonly VrpCustomer[] _customers;
-    private readonly double[,] _distance;
-    private readonly double[] _fromDepot;
+    private readonly VrpCostMatrix _costs;
 
     public VrpProblem(
         double depotX,
         double depotY,
         IEnumerable<VrpCustomer> customers,
         int vehicles,
-        int capacity)
+        int capacity,
+        VrpCostMatrix? costs = null)
     {
         ArgumentNullException.ThrowIfNull(customers);
 
@@ -26,6 +26,13 @@ public sealed class VrpProblem
 
         if (_customers.Length == 0)
             throw new ArgumentException("A routing problem needs at least one customer.", nameof(customers));
+
+        if (costs is not null && costs.CustomerCount != _customers.Length)
+        {
+            throw new ArgumentException(
+                $"The cost matrix covers {costs.CustomerCount} customers, but there are {_customers.Length}.",
+                nameof(costs));
+        }
 
         if (vehicles <= 0)
             throw new ArgumentOutOfRangeException(nameof(vehicles), "At least one vehicle is needed.");
@@ -67,21 +74,7 @@ public sealed class VrpProblem
         Vehicles = vehicles;
         Capacity = capacity;
 
-        _fromDepot = _customers
-            .Select(customer => Math.Sqrt(Math.Pow(customer.X - depotX, 2) + Math.Pow(customer.Y - depotY, 2)))
-            .ToArray();
-
-        _distance = new double[_customers.Length, _customers.Length];
-
-        for (var a = 0; a < _customers.Length; a++)
-        {
-            for (var b = 0; b < _customers.Length; b++)
-            {
-                _distance[a, b] = Math.Sqrt(
-                    Math.Pow(_customers[a].X - _customers[b].X, 2) +
-                    Math.Pow(_customers[a].Y - _customers[b].Y, 2));
-            }
-        }
+        _costs = costs ?? VrpCostMatrix.Euclidean(depotX, depotY, _customers);
     }
 
     public double DepotX { get; }
@@ -98,9 +91,14 @@ public sealed class VrpProblem
 
     public long TotalDemand => _customers.Sum(customer => (long)customer.Demand);
 
-    public double Distance(int from, int to) => _distance[from, to];
+    /// <summary>Cost of driving from one customer to another; need not equal the way back.</summary>
+    public double Distance(int from, int to) => _costs.Between(from, to);
 
-    public double FromDepot(int customer) => _fromDepot[customer];
+    /// <summary>Cost of driving from the depot to a customer.</summary>
+    public double FromDepot(int customer) => _costs.FromDepot(customer);
+
+    /// <summary>Cost of driving from a customer back to the depot.</summary>
+    public double ToDepot(int customer) => _costs.ToDepot(customer);
 
     /// <summary>
     /// A number of vehicles that is certain to be enough for these loads (first-fit decreasing).

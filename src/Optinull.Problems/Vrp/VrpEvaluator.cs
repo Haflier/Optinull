@@ -12,7 +12,7 @@ public static class VrpEvaluator
         if (route.Count == 0)
             return 0;
 
-        var distance = problem.FromDepot(route[0]) + problem.FromDepot(route[^1]);
+        var distance = problem.FromDepot(route[0]) + problem.ToDepot(route[^1]);
 
         for (var i = 1; i < route.Count; i++)
             distance += problem.Distance(route[i - 1], route[i]);

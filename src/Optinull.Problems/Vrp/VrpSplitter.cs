@@ -50,7 +50,7 @@ public static class VrpSplitter
                     if (double.IsPositiveInfinity(before))
                         continue;
 
-                    var cost = before + problem.FromDepot(order[j]) + path + problem.FromDepot(order[i - 1]);
+                    var cost = before + problem.FromDepot(order[j]) + path + problem.ToDepot(order[i - 1]);
 
                     if (cost < best[k, i])
                     {
