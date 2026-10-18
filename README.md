@@ -27,12 +27,12 @@ Optinull is an optimization engine written in C# / .NET with a Telegram bot as i
 ## Features
 
 - **Five search strategies:** Greedy, Hill Climbing, Iterated Local Search, Simulated Annealing, and Genetic Algorithm.
-- **Three optimization problems:** Job Shop Scheduling, Traveling Salesman Problem (TSP), and 0/1 Knapsack.
+- **Four optimization problems:** Job Shop Scheduling, Traveling Salesman Problem (TSP), 0/1 Knapsack, and Capacitated Vehicle Routing.
 - **Comparable runs:** compare solvers on the same instance with the same seed and evaluation budget.
 - **Reproducible experiments:** specify a seed; the default is `42`.
 - **Interactive and direct workflows:** use `/optimize` for a guided flow or `/solve` for command-driven runs.
-- **Automatic solver tuning:** choose problem- and budget-dependent settings for Simulated Annealing, Genetic Algorithm, and Iterated Local Search, with chat parameters available to override them.
-- **Visual results:** convergence and comparison charts, job-shop schedules, TSP routes, and knapsack selections.
+- **Automatic settings, optional overrides:** the engine chooses solver settings for each problem and evaluation budget; override any of them from chat, and every result lists the settings it used.
+- **Visual results:** convergence and comparison charts, job-shop schedules, TSP routes, knapsack selections, and vehicle routes.
 - **Bounded execution:** queued jobs, one active job per chat, cancellation, input limits, and a 60-second job timeout.
 
 ## Supported problems
@@ -42,6 +42,7 @@ Optinull is an optimization engine written in C# / .NET with a Telegram bot as i
 | Job Shop Scheduling | Minimize makespan | `ft06`, `ft10` | `jobs=6 machines=6` |
 | Traveling Salesman Problem | Minimize tour length | `circle20`, `grid8`, `random50` | `cities=20` |
 | 0/1 Knapsack | Maximize total value | `knap20`, `knap100` | `items=30` |
+| Vehicle Routing (CVRP) | Minimize total distance | `vrp15`, `vrp40` | `customers=20 vehicles=4` |
 
 The job-shop benchmarks have known optimal makespans of **55** (`ft06`) and **930** (`ft10`). These values are reference optima, not a guarantee that every heuristic run will find them.
 
@@ -55,6 +56,24 @@ The job-shop benchmarks have known optimal makespans of **55** (`ft06`) and **93
 | `sa` | Simulated Annealing | Probabilistic local search; default solver |
 | `ga` | Genetic Algorithm | Population-based search with selection, crossover, mutation, and local search |
 | `all` | Compare all solvers | Runs all five strategies for comparison |
+
+## Tuning
+
+By default Optinull chooses the solver settings for each problem and budget. To change one, add it to the command:
+
+```text
+/solve ft10 sa temperature=2
+/solve tsp cities=50 ga population=100 mutation=0.3
+/compare knapsack items=60 mutation=0.1
+```
+
+Only the settings you give are overridden; everything else stays automatic. A single run lists everything the solver used, marked `(auto)` or `(yours)`, so a run can be reproduced from the chat:
+
+```text
+Settings: population=22 (auto), elite=2 (auto), mutation=0.3 (yours), tournament=3 (auto), localsearch=10 (auto)
+```
+
+`temperature` is relative to the problem's usual starting temperature, so the same value means the same thing on a tour, a schedule, a knapsack, and a delivery plan. Setting names, ranges, and the automatic rules are in the [documentation](docs/README.md#solver-tuning).
 
 ## Quick start
 
@@ -89,4 +108,4 @@ dotnet test
 
 ---
 
-For command syntax, tuning ranges, custom input formats, architecture, extension points, and testing details, see the **[<u>Optinull documentation</u>](docs/README.md)**.
+For command syntax, tuning settings and automatic rules, custom input formats, architecture, extension points, and testing details, see the **[<u>Optinull documentation</u>](docs/README.md)**.

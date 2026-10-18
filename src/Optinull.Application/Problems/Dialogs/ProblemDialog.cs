@@ -41,7 +41,8 @@ public sealed record DialogEntries(
     string CountKey,
     Func<IReadOnlyDictionary<string, int>, int, int, string> Prompt,
     Func<string, IReadOnlyDictionary<string, int>, IReadOnlyList<string>, LineResult> ParseLine,
-    Func<IReadOnlyDictionary<string, int>, IReadOnlyList<string>, string> BuildText);
+    Func<IReadOnlyDictionary<string, int>, IReadOnlyList<string>, string> BuildText,
+    int ExtraLines = 0);
 
 /// <summary>
 /// The shared engine: some whole-number questions, then the data lines. The collected
@@ -104,7 +105,7 @@ internal sealed class GuidedDialog : IProblemDialog
 
     private DialogResult AnswerEntries(string input)
     {
-        var total = _answers[_entries.CountKey];
+        var total = _answers[_entries.CountKey] + _entries.ExtraLines;
 
         if (input.Equals("undo", StringComparison.OrdinalIgnoreCase))
         {
@@ -173,7 +174,7 @@ internal sealed class GuidedDialog : IProblemDialog
     }
 
     private string EntryPrompt() =>
-        _entries.Prompt(_answers, _lines.Count, _answers[_entries.CountKey]);
+        _entries.Prompt(_answers, _lines.Count, _answers[_entries.CountKey] + _entries.ExtraLines);
 }
 
 /// <summary>Helpers shared by the problems' line parsers.</summary>

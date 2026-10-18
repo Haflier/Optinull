@@ -95,7 +95,7 @@ Solver keywords:
 - `ga` — Genetic Algorithm
 - `all` — run all five solvers; `/compare` is an equivalent explicit command
 
-The problem argument can be a built-in instance name (`ft06`, `circle20`, `knap20`, and so on) or a problem type (`jobshop`, `tsp`, `knapsack`). A problem type can be followed by custom instance text or by parameters to generate a random instance.
+The problem argument can be a built-in instance name (`ft06`, `circle20`, `knap20`, `vrp15`, and so on) or a problem type (`jobshop`, `tsp`, `knapsack`, `vrp`). A problem type can be followed by custom instance text or by parameters to generate a random instance.
 
 ### Examples
 
@@ -139,6 +139,7 @@ The parser accepts iteration aliases `iteration`, `iter`, and `it`. Tuning alias
 | `jobshop` | Minimize makespan | `ft06`, `ft10` | `jobs`, `machines` |
 | `tsp` | Minimize tour length | `circle20`, `grid8`, `random50` | `cities` |
 | `knapsack` | Maximize total value | `knap20`, `knap100` | `items` |
+| `vrp` | Minimize total distance | `vrp15`, `vrp40` | `customers`, `vehicles` |
 
 ### Job Shop Scheduling
 
@@ -194,41 +195,71 @@ Generate a random instance:
 
 Custom input supports up to 100 items, capacity up to 100,000, item values up to 100,000, and input text up to 20,000 characters. Capacity, values, and weights are whole numbers; weights must be positive.
 
+### Vehicle Routing (VRP)
+
+Capacitated vehicle routing with one depot. Vehicles start and end at the depot, every customer is served exactly once, and no vehicle carries more than its capacity. At most the given number of vehicles may be used (a vehicle may stay home). Optinull minimizes the total distance of all routes, using Euclidean distances.
+
+Built-in instances:
+
+- `vrp15` — 15 customers, 3 vehicles
+- `vrp40` — 40 customers, 6 vehicles
+
+Generate a random instance:
+
+```text
+/solve vrp customers=30 vehicles=5 seed=7
+```
+
+Customers lie in a 100 × 100 square around a central depot with demands from 1 to 20. The generator chooses a capacity that leaves the vehicles about 80% full on average, and raises it if the loads would not fit the fleet.
+
+Every plan the solvers build and every move they make keeps the capacity and the fleet size, so a result is always a valid plan. Greedy is a nearest-neighbour heuristic with capacity. Hill Climbing, Iterated Local Search, and Simulated Annealing move a customer to any route (including an unused vehicle), swap two customers, or reverse a stretch of one route. The Genetic Algorithm recombines the customers' order and cuts it into routes again with the cheapest split that fits the fleet.
+
+The loads must fit the fleet: custom input is rejected, naming the number of vehicles needed, when the vehicles cannot carry all demands (the check uses first-fit decreasing, which never needs fewer vehicles than a feasible plan, but can ask for one more than the true minimum). The parser limits custom input to 100 customers, 20 vehicles, capacity up to 100,000, coordinates within ±1,000,000, and 20,000 characters.
+
 ## Solver tuning
 
-Tuning values are written as `key=value` tokens alongside `iterations`, `seed`, and problem parameters. The value ranges are validated by the command parser. A tuning key belongs to one solver; for a single-solver command, specify that solver explicitly when required. With `/compare` or `all`, each setting is applied only to its corresponding solver.
+By default the engine chooses every solver setting for the problem and the evaluation budget, so a plain `/solve ft10 ga` needs no tuning. To change a setting, add it as a `key=value` token alongside `iterations`, `seed`, and problem parameters. Only the settings you give are overridden; everything you leave out stays automatic (see [Automatic settings](#automatic-settings)).
 
-### Automatic tuning and overrides
-
-For Simulated Annealing (`sa`), Genetic Algorithm (`ga`), and Iterated Local Search (`ils`), Optinull selects tuning values automatically based on the problem and evaluation budget. You do not need to supply every tuning parameter.
-
-An explicitly supplied setting overrides the automatically selected value for that setting; other settings remain automatic. For example, `population=100` overrides the Genetic Algorithm's population size without requiring you to specify its mutation rate, elite count, or other settings. During `/compare` or `/solve ... all`, a setting is routed only to the solver it belongs to.
-
-The result summary reports the effective tuning settings and distinguishes automatic values from user-specified overrides. This makes the configuration of a run visible when reviewing or comparing results. Automatic tuning is a starting configuration, not a guarantee that a solver will find an optimal solution.
+The value ranges are validated by the command parser. A tuning key belongs to one solver; for a single-solver command, specify that solver explicitly when required. With `/compare` or `all`, each setting is applied only to its corresponding solver.
 
 ### Settings reference
 
-The ranges below describe accepted user-supplied values. Effective automatic values can differ by problem and evaluation budget, so they are not fixed defaults.
+| Solver | Key | Alias | Range | Automatic value at 20,000 evaluations | Meaning |
+|---|---|---|---:|---:|---|
+| Simulated Annealing (`sa`) | `temperature` | `temp` | 0.01–100 | 1 | Multiplier for the problem's usual initial temperature |
+| `sa` | `final` | `end` | 0.00000001–0.5 | 0.00001 | Final temperature as a fraction of the initial temperature |
+| `sa` | `moves` | — | 1–10,000 | 90 | Moves tried at each temperature level |
+| Genetic Algorithm (`ga`) | `population` | `pop` | 2–500 | 50; job shop 30 | Population size |
+| `ga` | `mutation` | `mut` | 0–1 | 0.2 | Probability that a child is mutated |
+| `ga` | `elite` | — | 0–100 | 2 | Number of best individuals retained unchanged; cannot exceed population |
+| `ga` | `tournament` | — | 1–50 | 3 | Number of candidates in a parent-selection tournament; cannot exceed population |
+| `ga` | `localsearch` | `ls` | 0–200 | 10; job shop 30 | Local-search attempts per child |
+| Iterated Local Search (`ils`) | `perturbation` | `perturb` | 1–50 | 3 | Number of random moves used to perturb a solution between local-search phases |
 
-| Solver | Key | Alias | Range | Meaning |
-|---|---|---|---:|---|
-| Simulated Annealing (`sa`) | `temperature` | `temp` | 0.01–100 | Multiplier for the problem's usual initial temperature |
-| `sa` | `final` | `end` | 0.00000001–0.5 | Final temperature as a fraction of the initial temperature |
-| `sa` | `moves` | — | 1–10,000 | Moves tried at each temperature level |
-| Genetic Algorithm (`ga`) | `population` | `pop` | 2–500 | Population size |
-| `ga` | `mutation` | `mut` | 0–1 | Probability that a child is mutated |
-| `ga` | `elite` | — | 0–100 | Number of best individuals retained unchanged; cannot exceed population |
-| `ga` | `tournament` | — | 1–50 | Number of candidates in a parent-selection tournament; cannot exceed population |
-| `ga` | `localsearch` | `ls` | 0–200 | Local-search attempts per child |
-| Iterated Local Search (`ils`) | `perturbation` | `perturb` | 1–50 | Number of random moves used to perturb a solution between local-search phases |
+The `elite` and `tournament` values must also be valid relative to `population`. For example, `population=10 tournament=20` is rejected even though both values individually fit their documented ranges. Because the automatic population depends on the problem and the budget, this combination check happens when the job starts, and the chat names the setting that is too large (for example `elite (40) cannot be more than population (30).`).
 
-The `elite` and `tournament` values must also be valid relative to `population`. For example, `population=10 tournament=20` is rejected even though both values individually fit their documented ranges.
+### Automatic settings
+
+Every setting you do not give is chosen by the engine; every setting you do give is used exactly as given. The values in the table above are what the engine chooses at the default budget of 20,000 evaluations. They change with the problem and with `iterations`:
+
+| Solver | What is automatic | Rule |
+|---|---|---|
+| `sa` | `moves` | The schedule keeps the shape of the default one (about 220 temperature levels) at any budget: `moves` is `iterations / 222`, between 5 and 1,000. A small budget gets few moves per level, a large one gets many. |
+| `sa` | `temperature`, `final` | `temperature=1` is the problem's usual start (see [temperature scaling](#simulated-annealing-temperature-scaling)); `final` is 0.00001. |
+| `ga` | `population` | Small enough to run at least about 20 generations within the budget (`iterations / (20 × (localsearch + 1))`), never above the problem's default (50, job shop 30) and never below 10. |
+| `ga` | `elite`, `tournament` | `elite` is the larger of 2 and a twenty-fifth of the population; `tournament` is 3, or the population if that is smaller. |
+| `ga` | `mutation`, `localsearch` | The problem's defaults: 0.2, and 10 (job shop 30). |
+| `ils` | `perturbation` | About one random move per 20 parts of the problem (cities, items, operations, or customers), between 3 and 8. Instances up to about 60 parts keep 3. |
+
+Greedy and Hill Climbing have no settings. A single run reports everything its solver used (see [How results are reported](#how-results-are-reported)), so you can see what the engine chose and copy it as a starting point for your own values.
+
+These rules are reasoned defaults, not proven optima. The skipped sweeps in `tests/Optinull.Application.Tests/Tuning/SolverTuningExperiments.cs` print the mean result per problem for a range of values of one setting (the engine's current choice is the first row); use them to check a rule and change it where another value clearly wins on most problems.
 
 ### Simulated Annealing temperature scaling
 
-The initial temperature is problem-dependent because TSP distances, job-shop makespans, and knapsack values use different scales. `temperature=1` preserves the problem's usual initial temperature; `temperature=2` doubles it. This is a multiplier, not an absolute temperature.
+The initial temperature is problem-dependent because TSP and routing distances, job-shop makespans, and knapsack values use different scales. `temperature=1` preserves the problem's usual initial temperature; `temperature=2` doubles it. This is a multiplier, not an absolute temperature.
 
-For a custom cooling schedule, `moves` controls the number of moves tried per temperature level and `final` controls the ending temperature as a fraction of the start. The evaluation budget influences the number of temperature levels.
+For a custom cooling schedule, `moves` controls the number of moves tried per temperature level and `final` controls the ending temperature as a fraction of the start. The evaluation budget decides how long the run is: it holds `iterations / moves` temperature levels, so a custom `moves` never makes a run longer than the budget allows. Without `moves`, the engine picks it so that the run has about 220 levels.
 
 Examples:
 
@@ -247,7 +278,7 @@ ILS first performs a local climb before attempting perturb-and-restart cycles. I
 
 ## Custom problem input
 
-Custom instances can be sent as lines after the command or uploaded as a `.txt` file with the command as its caption. The input is parsed according to the selected problem type. Blank lines and lines beginning with `#` are ignored by the TSP and knapsack parsers; separators may include spaces, tabs, commas, or semicolons.
+Custom instances can be sent as lines after the command or uploaded as a `.txt` file with the command as its caption. The input is parsed according to the selected problem type. Blank lines and lines beginning with `#` are ignored by the TSP, knapsack, and routing parsers; separators may include spaces, tabs, commas, or semicolons.
 
 ### Job shop format
 
@@ -291,6 +322,21 @@ The first line is the positive integer capacity. Each following line contains on
 
 In this example, the solver chooses a subset whose total weight is at most 50 and whose total value is as large as possible.
 
+### Vehicle routing format
+
+The first line is `vehicles capacity`, the second line is the depot as `x y`, and every following line is one customer as `x y demand`. Demands are whole numbers from 1 up to the capacity; coordinates may be decimal (with a dot).
+
+```text
+/solve vrp ga
+3 30
+50 50
+20 30 7
+80 65 12
+60 20 9
+```
+
+Here three vehicles of capacity 30 start at (50, 50) and serve three customers needing 7, 12, and 9 units.
+
 ### Uploading a text file
 
 Attach a `.txt` file to a Telegram message and put the command in the caption, for example:
@@ -299,20 +345,21 @@ Attach a `.txt` file to a Telegram message and put the command in the caption, f
 /solve jobshop sa
 ```
 
-Use the matching problem id (`jobshop`, `tsp`, or `knapsack`) and follow that problem's input format. The application also has a 30 KB file-attachment limit.
+Use the matching problem id (`jobshop`, `tsp`, `knapsack`, or `vrp`) and follow that problem's input format. The application also has a 30 KB file-attachment limit.
 
 ## How results are reported
 
 A completed run can include:
 
-- **Score:** makespan, tour length, or total knapsack value, depending on the problem.
+- **Score:** makespan, tour length, total knapsack value, or total route distance, depending on the problem.
 - **Improvement over greedy:** a relative comparison against the Greedy baseline when that comparison is defined.
 - **Convergence chart:** how the recorded best score changed during search.
-- **Problem-specific chart:** a Gantt chart for job shop, a route plot for TSP, or selected/unselected items for knapsack.
+- **Problem-specific chart:** a Gantt chart for job shop, a route plot for TSP, selected/unselected items for knapsack, or one coloured route per vehicle (with its load) for vehicle routing.
 - **Comparison summary:** relative solver results, elapsed time, evaluation count, and best-result/tie information.
-- **Changed tuning settings:** included in the response summary so the run configuration is visible.
+- **Settings used:** a single run lists every setting its solver used, each marked `(auto)` when the engine chose it and `(yours)` when you set it, for example `Settings: population=22 (auto), elite=2 (auto), mutation=0.3 (yours), tournament=3 (auto), localsearch=10 (auto)`. Greedy and Hill Climbing have no settings to list.
+- **Settings in a comparison:** the comparison summary lists only the settings you set, each tagged with the solver it was applied to, for example `Settings: temperature=2 (SA), mutation=0.3 (GA)`.
 
-The objective direction differs by problem: lower is better for makespan and tour length; higher is better for knapsack value. Always compare scores within the same problem instance and objective.
+The objective direction differs by problem: lower is better for makespan, tour length, and total route distance; higher is better for knapsack value. Always compare scores within the same problem instance and objective.
 
 ## Architecture
 
@@ -322,7 +369,7 @@ Optinull uses a layered design. Telegram-specific code is kept at the edge; prob
 Optinull.Bot
   ├── Optinull.Infrastructure       Telegram polling and replies
   └── Optinull.Application          Commands, dialogs, registry, queue, execution
-        ├── Optinull.Problems        Job Shop, TSP, Knapsack
+        ├── Optinull.Problems        Job Shop, TSP, Knapsack, Vehicle Routing
         ├── Optinull.Optimization    Search algorithms and shared search abstractions
         ├── Optinull.Reporting       Chart rendering
         └── Optinull.Domain          Core optimization model
@@ -335,7 +382,7 @@ Optinull.Bot
 | `Optinull.Domain` | Optimization model: variables, expressions, constraints, objectives, solutions, and evaluation |
 | `Optinull.Optimization` | Problem-independent search algorithms, neighborhoods, random solution generation, comparisons, and seeded randomness |
 | `Optinull.Problems` | Concrete problem representations, evaluators, parsers, benchmark instances, random generators, and experiment support |
-| `Optinull.Reporting` | PNG chart rendering for convergence, comparisons, schedules, routes, and knapsack selections |
+| `Optinull.Reporting` | PNG chart rendering for convergence, comparisons, schedules, routes, vehicle routes, and knapsack selections |
 | `Optinull.Application` | Telegram command parsing, guided dialogs, problem registry, bounded job queue, job execution, and comparison orchestration |
 | `Optinull.Infrastructure` | Telegram polling and sending text/photo replies |
 | `Optinull.Bot` | .NET Worker Service host and dependency-injection composition root |
@@ -388,6 +435,16 @@ dotnet test tests/Optinull.Integration.Tests
 
 The suite includes coverage for domain evaluation, search behavior and reproducibility, problem parsers and benchmarks, reporting, command parsing, tuning, job queue/executor behavior, and integration scenarios. A test passing does not establish that a heuristic always finds a known optimum; stochastic optimization should be evaluated across seeds and budgets when making performance claims.
 
+### Tuning experiments
+
+The automatic settings are checked by ordinary tests (the rules and the values at the default budget) and improved with manual experiments. `tests/Optinull.Application.Tests/Tuning/SolverTuningExperiments.cs` holds sweeps that are skipped by default. Remove the `Skip` of one and run it to print a table:
+
+```bash
+dotnet test tests/Optinull.Application.Tests --filter SolverTuningExperiments --logger "console;verbosity=detailed"
+```
+
+Each sweep runs one solver over 10 seeds on `ft06`, `ft10`, `random50`, `grid8`, and `knap100` for a list of values of one setting. The first row, `auto`, is the engine's current choice. Lower is better for the schedules and tours, higher is better for the knapsack. A sweep takes a minute or two, mostly on `ft10`.
+
 ## Operational limits and current scope
 
 The current implementation is a single-process Telegram bot:
@@ -409,14 +466,16 @@ The README tracks these project-level next steps:
 - [ ] Integration-test coverage improvements
 - [ ] CI pipeline and container image
 - [ ] Persistent job and conversation storage
-- [ ] Additional problem types, such as vehicle routing and bin packing
+- [ ] Additional problem types, such as bin packing
+- [ ] Calibrate the automatic solver settings from the tuning sweeps
 
 Already implemented:
 
 - [x] Domain model with expression-based constraints and objectives
 - [x] Greedy, Hill Climbing, Iterated Local Search, Simulated Annealing, and Genetic Algorithm
-- [x] Job Shop, TSP, and Knapsack with benchmarks, parsers, and random generators
+- [x] Job Shop, TSP, Knapsack, and Vehicle Routing with benchmarks, parsers, and random generators
 - [x] Telegram `/optimize`, `/solve`, `/compare`, and `/cancel` flows
 - [x] Convergence and problem-specific charts
 - [x] Progress tracking, cancellation, time limits, and per-chat job limits
 - [x] Solver tuning through chat parameters
+- [x] Automatic per-problem and per-budget solver settings, with user overrides

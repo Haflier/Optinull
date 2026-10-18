@@ -25,7 +25,7 @@ public sealed class OptimizeWizardTests
         await processor.ProcessAsync("/optimize", 1, replies);
 
         Assert.Equal("Choose a problem:", replies.Choices[^1].Text);
-        Assert.Equal(new[] { "o:jobshop", "o:tsp", "o:knapsack" }, Data(replies));
+        Assert.Equal(new[] { "o:jobshop", "o:tsp", "o:knapsack", "o:vrp" }, Data(replies));
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public sealed class OptimizeWizardTests
             jobs++;
 
         Assert.Equal(started, jobs);
-        Assert.Equal(54, jobs);
+        Assert.Equal(72, jobs);
     }
 
     [Fact]
