@@ -69,6 +69,7 @@ public static class BotCommandParser
 
         SolverKind? solver = null;
         var compare = forceCompare;
+        var onMap = false;
         int? iterations = null;
         int? seed = null;
         var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -80,6 +81,13 @@ public static class BotCommandParser
 
             if (equals < 0)
             {
+                // "/solve vrp map": the problem is drawn on a map. Repeating it is harmless.
+                if (IsMapToken(token))
+                {
+                    onMap = true;
+                    continue;
+                }
+
                 if (IsCompareToken(token))
                 {
                     if (solver is not null)
@@ -153,6 +161,15 @@ public static class BotCommandParser
             }
         }
 
+        // The map shows the routes of one algorithm, so there is nothing to compare there.
+        if (onMap && compare)
+        {
+            return new InvalidCommand(forceCompare
+                ? "/compare runs every solver, but the map shows one algorithm's routes. " +
+                  "Use /solve <problem> map [greedy|hc|ils|sa|ga] instead."
+                : "The map shows one algorithm's routes. Choose greedy, hc, ils, sa or ga instead of all.");
+        }
+
         if (!TuningCatalog.TryBuild(tuningValues, solver, compare, out var tuning, out var tuningError))
             return new InvalidCommand(tuningError!);
 
@@ -164,8 +181,12 @@ public static class BotCommandParser
             seed,
             parameters.Count == 0 ? null : parameters,
             compare,
-            tuning);
+            tuning,
+            onMap);
     }
+
+    private static bool IsMapToken(string token) =>
+        token.Equals("map", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsCompareToken(string token) =>
         token.Equals("all", StringComparison.OrdinalIgnoreCase) ||

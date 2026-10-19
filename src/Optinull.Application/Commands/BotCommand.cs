@@ -14,6 +14,8 @@ public sealed record OptimizeCommand : BotCommand;
 /// Target is a built-in instance name (ft06, circle20, ...) or a problem id
 /// (jobshop, tsp) when the instance text follows the command. CompareAll runs
 /// every solver and ignores Solver. Tuning holds the solver settings the user changed.
+/// OnMap means "/solve vrp map": the problem is drawn on a map instead of typed in, and the
+/// command only carries the algorithm choices for it.
 /// </summary>
 public sealed record SolveCommand(
     string Target,
@@ -23,7 +25,8 @@ public sealed record SolveCommand(
     int? Seed = null,
     IReadOnlyDictionary<string, string>? Parameters = null,
     bool CompareAll = false,
-    SolverTuning? Tuning = null) : BotCommand
+    SolverTuning? Tuning = null,
+    bool OnMap = false) : BotCommand
 {
     private static readonly IReadOnlyDictionary<string, string> None =
         new Dictionary<string, string>();
