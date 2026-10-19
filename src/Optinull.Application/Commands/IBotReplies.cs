@@ -31,6 +31,17 @@ public interface IBotReplies
             cancellationToken);
     }
 
+    /// <summary>
+    /// Sends before + code + after, with the code part in monospace so it is easy to copy.
+    /// Channels without formatting send it as plain text.
+    /// </summary>
+    Task SendTextWithCodeAsync(
+        string before,
+        string code,
+        string after,
+        CancellationToken cancellationToken) =>
+        SendTextAsync(before + code + after, cancellationToken);
+
     /// <summary>Shows or updates a progress bar for a running job. fraction is 0..1.</summary>
     Task ReportProgressAsync(
         double fraction,

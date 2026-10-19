@@ -1,6 +1,7 @@
 using Optinull.Application.Commands;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 
 namespace Optinull.Infrastructure.Telegram;
@@ -35,6 +36,28 @@ internal sealed class TelegramReplies : IBotReplies
         await _client.SendMessage(
             _chatId,
             text,
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task SendTextWithCodeAsync(
+        string before,
+        string code,
+        string after,
+        CancellationToken cancellationToken)
+    {
+        // Entity offsets and lengths count UTF-16 code units, which is what string indexes are.
+        await _client.SendMessage(
+            _chatId,
+            before + code + after,
+            entities:
+            [
+                new MessageEntity
+                {
+                    Type = MessageEntityType.Code,
+                    Offset = before.Length,
+                    Length = code.Length
+                }
+            ],
             cancellationToken: cancellationToken);
     }
 
