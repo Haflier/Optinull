@@ -6,7 +6,7 @@ using Optinull.Reporting.Charts;
 
 namespace Optinull.Application.Problems;
 
-public sealed class VrpModule : IProblemModule
+public sealed class VrpModule : IMapProblemModule
 {
     public string Id => "vrp";
 
