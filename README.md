@@ -98,6 +98,27 @@ export Telegram__BotToken="<your-telegram-bot-token>"
 dotnet run --project src/Optinull.Bot
 ```
 
+## Vehicle routing on a real map
+
+Vehicle routing can also be drawn on a map, with trucks following real roads (OSRM distances). It sits under the usual commands:
+
+```text
+/solve vrp map [greedy|hc|ils|sa|ga] [iterations=N] [seed=N]
+/optimize  ->  Vehicle routing  ->  Map  ->  algorithm
+```
+
+The bot replies with a private link. On the page you place the depot and customers, set demands, trucks and capacity, and press Solve. The link works for one user, in a private chat only, and expires after the configured time (`MapSessions` in `src/Optinull.Web/appsettings.json`). `/cancel` stops a running map job, and closes the link when no job is running.
+
+Map sessions live in the web app's memory, so the map needs the web host, which runs the bot as well:
+
+```bash
+dotnet user-secrets set "Telegram:BotToken" "<your-telegram-bot-token>" --project src/Optinull.Web
+export MapSessions__PublicBaseUrl="https://<address your phone can reach>"
+dotnet run --project src/Optinull.Web
+```
+
+Do not run `Optinull.Bot` with the same token at the same time (Telegram allows one poller per bot). `Optinull.Bot` alone still works, without the map. The public OSRM demo server is for prototyping only; point `Osrm:BaseUrl` at your own instance for real use.
+
 ## Test
 
 Run the full test suite from the repository root:
