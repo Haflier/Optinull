@@ -1,6 +1,8 @@
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Optinull.Application.Jobs;
 
-namespace Optinull.Bot;
+namespace Optinull.Infrastructure.Hosting;
 
 /// <summary>Takes queued jobs and runs them, a few at a time.</summary>
 public sealed class JobWorker : BackgroundService

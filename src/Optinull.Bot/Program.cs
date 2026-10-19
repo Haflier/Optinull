@@ -1,8 +1,4 @@
-using Optinull.Application.Commands;
-using Optinull.Application.Jobs;
-using Optinull.Application.Problems;
-using Optinull.Bot;
-using Optinull.Infrastructure.Telegram;
+using Optinull.Infrastructure.Hosting;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -15,15 +11,9 @@ if (string.IsNullOrWhiteSpace(token))
         "or the Telegram__BotToken environment variable.");
 }
 
-builder.Services.AddSingleton(new TelegramBotOptions(token));
-builder.Services.AddSingleton(ProblemRegistry.CreateDefault());
-builder.Services.AddSingleton(ProblemRegistry.CreateDefault());
-builder.Services.AddSingleton(new JobQueue());
-builder.Services.AddSingleton(new JobExecutor());
-builder.Services.AddSingleton<BotCommandProcessor>();
-builder.Services.AddSingleton<TelegramPoller>();
-builder.Services.AddHostedService<Worker>();
-builder.Services.AddHostedService<JobWorker>();
+// This host has no web app, so it has no map: /solve vrp map is only offered by Optinull.Web.
+builder.Services.AddOptinullEngine();
+builder.Services.AddOptinullTelegram(token);
 
 var host = builder.Build();
 host.Run();
