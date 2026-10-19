@@ -16,6 +16,8 @@
 
 <p align="center">
   <a href="docs/README.md"><u>Documentation</u></a>
+  &nbsp;·&nbsp;
+  <a href="docs/README.md#screenshots"><u>Screenshots</u></a>
 </p>
 
 ---

@@ -459,6 +459,29 @@ The current implementation is a single-process Telegram bot:
 
 These are implementation defaults, not configurable deployment guarantees. Running multiple bot instances with the same Telegram token can cause polling conflicts; use a single active poller unless coordination is added.
 
+## Screenshots
+
+The screenshots below show Optinull's Telegram interface, optimization results, solver comparisons, and route visualizations.
+
+<table>
+  <tr>
+    <td align="center"><img src="images/screenshots/commands.webp" alt="Telegram commands" width="440"><br><sub>Telegram commands</sub></td>
+    <td align="center"><img src="images/screenshots/map-instance.webp" alt="Map-based vehicle routing" width="440"><br><sub>Map-based vehicle routing</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/screenshots/theory-vrp.webp" alt="Vehicle routing results" width="440"><br><sub>Vehicle routing</sub></td>
+    <td align="center"><img src="images/screenshots/theory-vrp-compare.webp" alt="Vehicle routing solver comparison" width="440"><br><sub>Vehicle routing comparison</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/screenshots/tsp.webp" alt="Traveling Salesman Problem result" width="440"><br><sub>Traveling Salesman Problem</sub></td>
+    <td align="center"><img src="images/screenshots/tsp-overview.webp" alt="TSP overview" width="440"><br><sub>TSP overview</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/screenshots/tsp-compare-conv.webp" alt="TSP solver comparison and convergence" width="440"><br><sub>TSP comparison and convergence</sub></td>
+    <td></td>
+  </tr>
+</table>
+
 ## Roadmap
 
 The README tracks these project-level next steps:
