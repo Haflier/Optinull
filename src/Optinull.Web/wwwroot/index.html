@@ -15,8 +15,11 @@
     <aside class="panel">
       <header>
         <h1>Routing map</h1>
+        <p id="session-info" class="session"></p>
         <p id="hint" class="hint"></p>
       </header>
+
+      <div id="locked" class="locked" role="alert" hidden></div>
 
       <section class="modes" role="group" aria-label="What a tap on the map does">
         <button id="mode-depot" type="button" aria-pressed="true">Place depot</button>
@@ -43,9 +46,12 @@
 
       <section id="summary" class="summary" aria-live="polite"></section>
       <div id="messages" class="messages" role="status" aria-live="polite"></div>
+      <section id="result" class="result" aria-live="polite" hidden></section>
 
       <footer class="actions">
-        <button id="validate" type="button">Check problem</button>
+        <button id="solve" type="button">Solve</button>
+        <button id="cancel-job" type="button" hidden>Cancel run</button>
+        <button id="validate" type="button" class="secondary">Check problem</button>
         <button id="clear" type="button" class="secondary">Clear all</button>
       </footer>
     </aside>

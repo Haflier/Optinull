@@ -3,18 +3,69 @@
 
   const $ = (id) => document.getElementById(id);
 
-  const fallback = { map: { latitude: 20, longitude: 0, zoom: 2 }, limits: { maxCustomers: 99 } };
-  const config = await fetch('/api/config')
-    .then((response) => (response.ok ? response.json() : fallback))
-    .catch(() => fallback);
+  // The Telegram bot sends a link like https://host/#s=<token>. The token sits after the "#", so
+  // the browser never sends it in a request line, and it never reaches a server log. It travels
+  // only in the Authorization header of the API calls below.
+  const token = new URLSearchParams(window.location.hash.slice(1)).get('s');
+
+  const EXPIRED = 'This map link is not valid or has expired. Send /solve vrp map to the bot for a new one.';
+
+  function api(path, options) {
+    const headers = Object.assign({}, options && options.headers);
+
+    if (token) headers.Authorization = 'Bearer ' + token;
+
+    return fetch(path, Object.assign({}, options, { headers }));
+  }
+
+  const fallback = { map: { latitude: 20, longitude: 0, zoom: 2 }, limits: { maxCustomers: 99 }, session: null };
+
+  // Why the page cannot be used, or null when it can. Without a valid session nothing is submitted.
+  let locked = null;
+
+  async function loadConfig() {
+    if (!token) {
+      locked = 'Open this page from the link the Telegram bot sent you. Send /solve vrp map to the bot.';
+
+      return fallback;
+    }
+
+    try {
+      const response = await api('/api/config');
+
+      if (response.ok) return await response.json();
+
+      locked = response.status === 401 || response.status === 410
+        ? EXPIRED
+        : 'The server could not load the map settings (' + response.status + ').';
+    } catch (error) {
+      locked = 'The server could not be reached.';
+    }
+
+    return fallback;
+  }
+
+  const config = await loadConfig();
 
   const state = {
     mode: 'depot',
     depot: null,         // { marker }
     customers: [],       // { marker, demand: number | null }
     depotBad: false,
-    badCustomers: new Set()
+    badCustomers: new Set(),
+    routeLayer: null,    // the drawn roads
+    customerColor: [],   // truck colour of each customer after a solve
+    stopInfo: [],        // "Truck 2, stop 3 of 4" of each customer after a solve
+    submitted: null,     // the problem as it was when Solve was pressed
+    drawnJob: null,      // the job whose routes are on the map
+    resultShown: false
   };
+
+  // One colour per truck, then they repeat. Chosen to stay apart on the map tiles.
+  const PALETTE = [
+    '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
+    '#008080', '#9a6324', '#f032e6', '#808000', '#000075'
+  ];
 
   // ---- Map ---------------------------------------------------------------------------------
 
@@ -25,14 +76,17 @@
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
 
-  function pinIcon(kind, label, demand, invalid) {
+  state.routeLayer = L.layerGroup().addTo(map);
+
+  function pinIcon(kind, label, demand, invalid, color) {
     const badge = demand === undefined
       ? ''
       : '<small>' + (Number.isFinite(demand) ? demand : '?') + '</small>';
 
     return L.divIcon({
       className: '',
-      html: '<div class="pin ' + kind + (invalid ? ' invalid' : '') + '">' + label + badge + '</div>',
+      html: '<div class="pin ' + kind + (invalid ? ' invalid' : '') + '"' +
+        (color && !invalid ? ' style="background:' + color + '"' : '') + '>' + label + badge + '</div>',
       iconSize: [32, 32],
       iconAnchor: [16, 16],
       popupAnchor: [0, -16]
@@ -63,7 +117,8 @@
 
     state.customers.forEach((customer, index) => {
       customer.marker.setIcon(
-        pinIcon('customer', String(index + 1), customer.demand, state.badCustomers.has(index)));
+        pinIcon('customer', String(index + 1), customer.demand, state.badCustomers.has(index),
+          state.customerColor[index]));
     });
   }
 
@@ -113,7 +168,12 @@
       renderList();
     });
     marker.bindPopup(() =>
-      popup('Customer ' + (state.customers.indexOf(customer) + 1), () => removeCustomer(customer)));
+      popup(
+        'Customer ' + (state.customers.indexOf(customer) + 1) +
+          (state.stopInfo[state.customers.indexOf(customer)]
+            ? ' \u00b7 ' + state.stopInfo[state.customers.indexOf(customer)]
+            : ''),
+        () => removeCustomer(customer)));
 
     state.customers.push(customer);
     clearFeedback();
@@ -230,7 +290,10 @@
   }
 
   // Any edit makes an earlier verdict stale.
-  function clearFeedback() {
+  // keep: true for the actions that must not discard the result (Check problem, Solve).
+  function clearFeedback(keep) {
+    if (keep !== true) clearResult();
+
     const hadMarks = state.depotBad || state.badCustomers.size > 0;
 
     $('messages').replaceChildren();
@@ -275,6 +338,8 @@
   }
 
   map.on('click', (event) => {
+    if (locked) return;
+
     // wrap() keeps the longitude in -180..180 when the map has been panned across the date line.
     const latlng = event.latlng.wrap();
 
@@ -308,7 +373,7 @@
   }
 
   async function validate() {
-    clearFeedback();
+    clearFeedback(true);
 
     const button = $('validate');
     button.disabled = true;
@@ -316,11 +381,16 @@
     let result;
 
     try {
-      const response = await fetch('/api/vrp/validate', {
+      const response = await api('/api/vrp/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(buildRequest())
       });
+
+      if (response.status === 401 || response.status === 410) {
+        lock(EXPIRED);
+        return;
+      }
 
       if (response.status === 413) throw new Error('The problem is too large to send.');
       if (!response.ok) throw new Error('The server could not read the problem (' + response.status + ').');
@@ -333,7 +403,7 @@
 
       return;
     } finally {
-      button.disabled = false;
+      button.disabled = locked !== null;
     }
 
     if (!result.valid) {
@@ -345,11 +415,360 @@
 
     showMessage('ok', [
       'The problem is valid: ' + summary.customers + ' customers, total demand ' + summary.totalDemand +
-      ', at least ' + summary.minVehicles + ' trucks needed. Optimization is connected in the next step.'
+      ', at least ' + summary.minVehicles + ' trucks needed. Press Solve to optimize.'
     ]);
   }
 
   $('validate').addEventListener('click', validate);
+
+  // ---- Solve ---------------------------------------------------------------------------------
+
+  let pollTimer = null;
+
+  function stopPolling() {
+    if (pollTimer !== null) {
+      window.clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function applyLock() {
+    const banner = $('locked');
+
+    banner.hidden = locked === null;
+    banner.textContent = locked || '';
+
+    ['solve', 'validate', 'clear', 'mode-depot', 'mode-customer', 'vehicles', 'capacity', 'new-demand']
+      .forEach((id) => { $(id).disabled = locked !== null; });
+
+    $('cancel-job').hidden = true;
+  }
+
+  function lock(reason) {
+    locked = reason;
+    stopPolling();
+    applyLock();
+  }
+
+  // While a job is queued or running the Solve button waits and Cancel run takes its place.
+  function setRunning(active) {
+    $('solve').disabled = active || locked !== null;
+    $('cancel-job').hidden = !active;
+  }
+
+  function kilometers(meters) {
+    return (meters / 1000).toFixed(1) + ' km';
+  }
+
+  function plural(count, word) {
+    return count + ' ' + word + (count === 1 ? '' : 's');
+  }
+
+  function renderStatus(status) {
+    const box = $('result');
+    const active = status.phase === 'Queued' || status.phase === 'Running';
+
+    setRunning(active);
+    box.replaceChildren();
+    box.classList.remove('failed');
+    box.hidden = status.phase === 'Idle';
+    state.resultShown = !active && status.phase !== 'Idle';
+
+    if (status.phase === 'Idle') return;
+
+    const title = document.createElement('div');
+    title.className = 'result-title';
+    box.append(title);
+
+    if (active) {
+      const percent = Math.round(status.progress * 100);
+
+      title.textContent = status.phase === 'Queued'
+        ? 'Waiting in the queue...'
+        : 'Optimizing' + (percent > 0 ? ' (' + percent + '%)' : '...');
+
+      if (percent > 0) {
+        const bar = document.createElement('progress');
+        bar.max = 100;
+        bar.value = percent;
+        box.append(bar);
+      }
+
+      return;
+    }
+
+    if (status.phase === 'Cancelled') {
+      title.textContent = 'The optimization was cancelled.';
+      return;
+    }
+
+    if (status.phase === 'Failed' || !status.solution) {
+      box.classList.add('failed');
+      title.textContent = 'The optimization did not finish. Details were sent to your Telegram chat. ' +
+        'You can change the problem and press Solve again.';
+      return;
+    }
+
+    const solution = status.solution;
+
+    title.textContent = solution.solver + ': ' + kilometers(solution.totalDistanceMeters) + ' in total, ' +
+      plural(solution.routes.length, 'truck') + ' used.';
+
+    const objective = document.createElement('div');
+    objective.className = 'hint';
+    objective.textContent = 'Objective value (total road distance): ' +
+      Math.round(solution.totalDistanceMeters) + ' m';
+    box.append(objective);
+
+    const list = document.createElement('ul');
+    list.className = 'trucks';
+
+    solution.routes.forEach((route, index) => {
+      const item = document.createElement('li');
+      const swatch = document.createElement('span');
+      const text = document.createElement('span');
+
+      swatch.className = 'swatch';
+      swatch.style.background = PALETTE[index % PALETTE.length];
+
+      text.textContent = 'Truck ' + (index + 1) + ': customers ' +
+        route.customers.map((customer) => customer + 1).join(' \u2192 ') +
+        ' \u00b7 load ' + route.load + ' of ' + route.capacity +
+        ' (' + (route.capacity - route.load) + ' left) \u00b7 ' + kilometers(route.distanceMeters);
+
+      item.append(swatch, text);
+      list.append(item);
+    });
+
+    box.append(list);
+
+    showSolution(status);
+  }
+
+  // ---- Routes on the map ---------------------------------------------------------------------
+
+  function clearResult() {
+    state.routeLayer.clearLayers();
+    state.customerColor = [];
+    state.stopInfo = [];
+    state.drawnJob = null;
+
+    if (state.resultShown) {
+      $('result').hidden = true;
+      state.resultShown = false;
+    }
+  }
+
+  function addNote(text) {
+    const note = document.createElement('p');
+
+    note.className = 'hint';
+    note.textContent = text;
+    $('result').append(note);
+
+    return note;
+  }
+
+  function showSolution(status) {
+    if (state.drawnJob === status.jobId) return;
+
+    // The customer numbers in the solution are positions in the list that was submitted. If the
+    // problem was edited since, they no longer point at the same pins, so nothing is drawn.
+    if (state.submitted !== JSON.stringify(buildRequest())) {
+      addNote('The problem was changed after it was submitted, so these routes are not drawn.');
+      return;
+    }
+
+    state.drawnJob = status.jobId;
+
+    status.solution.routes.forEach((route, index) => {
+      route.customers.forEach((customer, stop) => {
+        state.customerColor[customer] = PALETTE[index % PALETTE.length];
+        state.stopInfo[customer] = 'Truck ' + (index + 1) + ', stop ' + (stop + 1) + ' of ' + route.customers.length;
+      });
+    });
+
+    renderList();
+    loadGeometry(status.jobId, status.solution);
+  }
+
+  async function loadGeometry(jobId, solution) {
+    const loading = addNote('Loading the roads...');
+    let routes = null;
+
+    try {
+      const response = await api('/api/vrp/geometry');
+
+      if (response.status === 401 || response.status === 410) {
+        lock(EXPIRED);
+        return;
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+
+        if (data.jobId === jobId) routes = data.routes;
+      }
+    } catch (error) {
+      // The routes are still listed; the roads are drawn as straight lines below.
+    }
+
+    // The user edited or re-solved while the roads were loading.
+    if (state.drawnJob !== jobId) return;
+
+    loading.remove();
+    drawRoutes(solution, routes);
+  }
+
+  function drawRoutes(solution, roads) {
+    const depot = state.depot.marker.getLatLng();
+    let missing = 0;
+
+    state.routeLayer.clearLayers();
+
+    solution.routes.forEach((route, index) => {
+      const color = PALETTE[index % PALETTE.length];
+      const road = roads && roads[index] && roads[index].points ? roads[index].points : null;
+
+      if (road) {
+        L.polyline(road, { color, weight: 5, opacity: 0.85 }).addTo(state.routeLayer);
+        return;
+      }
+
+      // No road for this truck: show the visiting order as a dashed straight line instead.
+      missing++;
+
+      const stops = route.customers.map((customer) => state.customers[customer].marker.getLatLng());
+
+      L.polyline([depot, ...stops, depot], { color, weight: 4, opacity: 0.8, dashArray: '8 8' })
+        .addTo(state.routeLayer);
+    });
+
+    if (missing > 0) {
+      addNote(
+        'The roads of ' + plural(missing, 'truck') + ' could not be loaded, so ' +
+        (missing === 1 ? 'its dashed line shows' : 'their dashed lines show') +
+        ' only the visiting order. The routes and distances above are still correct.');
+    }
+
+    const bounds = state.routeLayer.getLayers().reduce(
+      (all, layer) => all.extend(layer.getBounds()),
+      L.latLngBounds([depot]));
+
+    map.fitBounds(bounds, { padding: [30, 30] });
+  }
+
+  // initial: the page was just opened. Only a job still in progress is worth showing then.
+  async function poll(initial) {
+    pollTimer = null;
+
+    let response;
+
+    try {
+      response = await api('/api/vrp/status');
+    } catch (error) {
+      // The connection may be down for a moment; keep trying while a job is running.
+      if (!initial) pollTimer = window.setTimeout(poll, 3000);
+      return;
+    }
+
+    if (response.status === 401 || response.status === 410) {
+      lock(EXPIRED);
+      return;
+    }
+
+    if (!response.ok) {
+      if (!initial) pollTimer = window.setTimeout(poll, 3000);
+      return;
+    }
+
+    const status = await response.json();
+    const active = status.phase === 'Queued' || status.phase === 'Running';
+
+    if (active || !initial) renderStatus(status);
+
+    if (active) pollTimer = window.setTimeout(poll, 1000);
+  }
+
+  async function solve() {
+    clearResult();
+    clearFeedback(true);
+    stopPolling();
+
+    $('solve').disabled = true;
+
+    let response;
+    let body;
+
+    try {
+      const request = JSON.stringify(buildRequest());
+
+      state.submitted = request;
+
+      response = await api('/api/vrp/solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: request
+      });
+
+      body = await response.json().catch(() => null);
+    } catch (error) {
+      $('solve').disabled = locked !== null;
+      showMessage('error', ['The server could not be reached.']);
+      return;
+    }
+
+    if (response.status === 401 || response.status === 410) {
+      lock(EXPIRED);
+      return;
+    }
+
+    if (response.status === 400 && body && Array.isArray(body.errors)) {
+      $('solve').disabled = false;
+      showErrors(body.errors);
+      return;
+    }
+
+    if (!response.ok || !body || !body.phase) {
+      $('solve').disabled = false;
+      showMessage('error', [
+        body && body.error
+          ? body.error
+          : response.status === 413
+            ? 'The problem is too large to send.'
+            : 'The server could not start the optimization (' + response.status + ').'
+      ]);
+      return;
+    }
+
+    renderStatus(body);
+    pollTimer = window.setTimeout(poll, 1000);
+  }
+
+  async function cancelRun() {
+    const button = $('cancel-job');
+
+    button.disabled = true;
+
+    try {
+      const response = await api('/api/vrp/cancel', { method: 'POST' });
+
+      if (response.status === 401 || response.status === 410) {
+        lock(EXPIRED);
+        return;
+      }
+
+      // Polling carries on and shows the final state once the job has stopped.
+      if (response.ok) renderStatus(await response.json());
+    } catch (error) {
+      showMessage('error', ['The server could not be reached.']);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  $('solve').addEventListener('click', solve);
+  $('cancel-job').addEventListener('click', cancelRun);
 
   $('clear').addEventListener('click', () => {
     if (!state.depot && state.customers.length === 0) return;
@@ -365,6 +784,15 @@
     setMode('depot');
   });
 
+  if (config.session) {
+    $('session-info').textContent = 'Algorithm: ' + config.session.solver +
+      (config.session.iterations ? ', ' + config.session.iterations + ' iterations' : '');
+  }
+
+  applyLock();
   setMode('depot');
   renderList();
+
+  // After a reload, pick up a job that is still in progress.
+  if (!locked) poll(true);
 })();
