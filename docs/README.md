@@ -469,16 +469,12 @@ The screenshots below show Optinull's Telegram interface, optimization results, 
     <td align="center"><img src="images/screenshots/map-instance.webp" alt="Map-based vehicle routing" width="440"><br><sub>Map-based vehicle routing</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="images/screenshots/theory-vrp.webp" alt="Vehicle routing results" width="440"><br><sub>Vehicle routing</sub></td>
+    <td align="center"><img src="images/screenshots/tsp-compare-conv.webp" alt="TSP solver comparison and convergence" width="440"><br><sub>TSP comparison and convergence</sub></td>
     <td align="center"><img src="images/screenshots/theory-vrp-compare.webp" alt="Vehicle routing solver comparison" width="440"><br><sub>Vehicle routing comparison</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="images/screenshots/tsp.webp" alt="Traveling Salesman Problem result" width="440"><br><sub>Traveling Salesman Problem</sub></td>
     <td align="center"><img src="images/screenshots/tsp-overview.webp" alt="TSP overview" width="440"><br><sub>TSP overview</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="images/screenshots/tsp-compare-conv.webp" alt="TSP solver comparison and convergence" width="440"><br><sub>TSP comparison and convergence</sub></td>
-    <td></td>
   </tr>
 </table>
 
