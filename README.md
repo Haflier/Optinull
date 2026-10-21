@@ -102,24 +102,28 @@ dotnet run --project src/Optinull.Bot
 
 ## Vehicle routing on a real map
 
-Vehicle routing can also be drawn on a map, with trucks following real roads (OSRM distances). It sits under the usual commands:
+Vehicle routing can also be set up with real places, with trucks following real roads (OSRM distances). It sits under the usual commands:
 
 ```text
 /solve vrp map [greedy|hc|ils|sa|ga] [iterations=N] [seed=N]
 /optimize  ->  Vehicle routing  ->  Map  ->  algorithm
 ```
 
-The bot replies with a private link. On the page you place the depot and customers, set demands, trucks and capacity, and press Solve. The link works for one user, in a private chat only, and expires after the configured time (`MapSessions` in `src/Optinull.Web/appsettings.json`). `/cancel` stops a running map job, and closes the link when no job is running.
+Everything happens in the chat, and the bot is the only host:
 
-Map sessions live in the web app's memory, so the map needs the web host, which runs the bot as well:
+1. Send the depot with Telegram's attach -> Location (pick any point or search for a place).
+2. Send the customers the same way, one per message. A number sent right after a customer sets its demand (default 1). You can also paste lines such as `52.5156, 13.3897 4` (latitude, longitude, optional demand).
+3. Press Done, then send the number of trucks and the capacity of one truck, for example `3 20`.
+4. Press Solve. The bot fetches road distances, solves the problem in the background on the job queue, and sends a PNG with every truck's route along the roads (numbered stops, one colour per truck, load and distance) plus the convergence chart.
+
+`/cancel` stops the dialog or the running job. The PNG is drawn on a plain background without street tiles. If the road shape of a truck cannot be loaded, that truck is drawn as straight lines and the caption says so.
+
+Routing uses the public OSRM demo server by default, which is for prototyping only. Point `Osrm:BaseUrl` at your own instance for real use:
 
 ```bash
-dotnet user-secrets set "Telegram:BotToken" "<your-telegram-bot-token>" --project src/Optinull.Web
-export MapSessions__PublicBaseUrl="https://<address your phone can reach>"
-dotnet run --project src/Optinull.Web
+export Osrm__BaseUrl="https://<your osrm server>"
+dotnet run --project src/Optinull.Bot
 ```
-
-Do not run `Optinull.Bot` with the same token at the same time (Telegram allows one poller per bot). `Optinull.Bot` alone still works, without the map. The public OSRM demo server is for prototyping only; point `Osrm:BaseUrl` at your own instance for real use.
 
 ## Test
 
