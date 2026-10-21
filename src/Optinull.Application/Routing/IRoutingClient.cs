@@ -1,9 +1,12 @@
 using Optinull.Problems.Vrp;
 
-namespace Optinull.Infrastructure.Routing;
+namespace Optinull.Application.Routing;
 
 public interface IRoutingClient
 {
+    /// <summary>The most places one request may cover, the depot included.</summary>
+    int MaxLocations { get; }
+
     /// <summary>
     /// Road distances in meters between the depot and the customers, directed (the way there
     /// can differ from the way back). Throws <see cref="UnreachableRouteException"/> when a

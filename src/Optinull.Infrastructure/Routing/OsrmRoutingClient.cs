@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using Optinull.Application.Routing;
 using Optinull.Problems.Vrp;
 
 namespace Optinull.Infrastructure.Routing;
@@ -19,6 +20,8 @@ public sealed class OsrmRoutingClient : IRoutingClient
         _http = http;
         _options = options ?? new OsrmOptions();
     }
+
+    public int MaxLocations => _options.MaxLocations;
 
     public async Task<VrpCostMatrix> GetCostMatrixAsync(
         GeoPoint depot,

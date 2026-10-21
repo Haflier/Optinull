@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Optinull.Application.Routing;
 using Optinull.Infrastructure.Routing;
 
 namespace Optinull.Integration.Tests.Routing;

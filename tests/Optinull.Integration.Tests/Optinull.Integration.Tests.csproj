@@ -25,7 +25,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Optinull.Application\Optinull.Application.csproj" />
     <ProjectReference Include="..\..\src\Optinull.Infrastructure\Optinull.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\src\Optinull.Web\Optinull.Web.csproj" />
   </ItemGroup>
 
 </Project>

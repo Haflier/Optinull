@@ -1,4 +1,4 @@
-namespace Optinull.Infrastructure.Routing;
+namespace Optinull.Application.Routing;
 
 /// <summary>A place on Earth in degrees (WGS84).</summary>
 public readonly record struct GeoPoint(double Latitude, double Longitude);

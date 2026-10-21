@@ -1,4 +1,4 @@
-namespace Optinull.Infrastructure.Routing;
+namespace Optinull.Application.Routing;
 
 /// <summary>The routing service failed, timed out, or answered something unusable.</summary>
 public class RoutingException : Exception
