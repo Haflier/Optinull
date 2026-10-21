@@ -1,8 +1,10 @@
 using System.Text;
 using Optinull.Application.Jobs;
-using Optinull.Application.MapSessions;
+using Optinull.Application.Maps;
 using Optinull.Application.Optimization;
 using Optinull.Application.Problems;
+using Optinull.Application.Routing;
+using Optinull.Problems.Vrp;
 
 namespace Optinull.Application.Commands;
 
@@ -12,24 +14,24 @@ public sealed class BotCommandProcessor
     private readonly JobQueue _queue;
     private readonly ProblemRegistry _registry;
     private readonly ConversationStore _conversations;
-    private readonly IMapSessionLauncher? _maps;
+    private readonly IRoutingClient? _routing;
 
-    /// <param name="maps">
-    /// Opens map sessions. Without it the bot has no map: /solve vrp map is refused and the
-    /// wizard does not offer Map.
+    /// <param name="routing">
+    /// Road distances and shapes. Without it the bot has no map: /solve vrp map is refused and
+    /// the wizard does not offer Map.
     /// </param>
     public BotCommandProcessor(
         JobQueue queue,
         ProblemRegistry? registry = null,
         TimeProvider? timeProvider = null,
-        IMapSessionLauncher? maps = null)
+        IRoutingClient? routing = null)
     {
         ArgumentNullException.ThrowIfNull(queue);
 
         _queue = queue;
         _registry = registry ?? ProblemRegistry.CreateDefault();
         _conversations = new ConversationStore(timeProvider ?? TimeProvider.System);
-        _maps = maps;
+        _routing = routing;
     }
 
     public string StartText
@@ -69,11 +71,11 @@ public sealed class BotCommandProcessor
             text.AppendLine(
                 "/solve <problem> [greedy|hc|ils|sa|ga|all] [iterations=N] [seed=N] [key=value ...]");
 
-            if (_maps is not null)
+            if (_routing is not null)
             {
                 text.AppendLine("/solve vrp map [greedy|hc|ils|sa|ga] [iterations=N] [seed=N]");
-                text.AppendLine("  Pick the depot and customers on a real map; trucks follow real roads.");
-                text.AppendLine("  Also in /optimize: Vehicle routing, then Map. Works in a private chat only.");
+                text.AppendLine("  Send the depot and customers as Telegram locations; trucks follow real roads.");
+                text.AppendLine("  Also in /optimize: Vehicle routing, then Map.");
             }
 
             text.AppendLine("/cancel - stop your current job");
@@ -134,6 +136,14 @@ public sealed class BotCommandProcessor
         ArgumentNullException.ThrowIfNull(replies);
 
         var command = BotCommandParser.Parse(text);
+
+        // Plain text while the user is sending places for a map problem is an answer.
+        if (!text.TrimStart().StartsWith('/') &&
+            _conversations.Get(chatId) is MapCollecting mapping)
+        {
+            await ContinueMapAsync(mapping, chatId, text, replies, cancellationToken);
+            return;
+        }
 
         // Plain text while the user is entering their own data is an answer.
         if (!text.TrimStart().StartsWith('/') &&
@@ -260,7 +270,7 @@ public sealed class BotCommandProcessor
         await QueueAsync(command, instance!, chatId, replies, cancellationToken);
     }
 
-    private async Task QueueAsync(
+    private async Task<bool> QueueAsync(
         SolveCommand command,
         IProblemInstance instance,
         long chatId,
@@ -270,7 +280,9 @@ public sealed class BotCommandProcessor
         // The parsed instance travels with the job; drop the raw text.
         var queued = command with { InstanceText = null };
 
-        var message = _queue.TryEnqueue(chatId, queued, replies, instance) switch
+        var enqueue = _queue.TryEnqueue(chatId, queued, replies, instance);
+
+        var message = enqueue switch
         {
             Enqueued enqueued =>
                 $"Queued job #{enqueued.Job.Id} ({instance.Description}, " +
@@ -286,6 +298,8 @@ public sealed class BotCommandProcessor
         };
 
         await replies.SendTextAsync(message, cancellationToken);
+
+        return enqueue is Enqueued;
     }
 
     // ---- The /optimize wizard ------------------------------------------------
@@ -327,6 +341,12 @@ public sealed class BotCommandProcessor
 
         var parts = (data ?? string.Empty).Split(':');
 
+        if (parts.Length == 2 && parts[0] == "m")
+        {
+            await ProcessMapButtonAsync(parts[1], chatId, replies, cancellationToken);
+            return;
+        }
+
         if (parts.Length < 2 || parts.Length > 4 || parts[0] != "o")
             return;
 
@@ -344,11 +364,11 @@ public sealed class BotCommandProcessor
                 await ShowDatasetsAsync(module, chatId, replies, cancellationToken);
                 break;
 
-            case 3 when parts[2] == "map" && CanOpenMap(module, chatId):
+            case 3 when parts[2] == "map" && CanOpenMap(module):
                 await ShowMapAlgorithmsAsync(module, replies, cancellationToken);
                 break;
 
-            case 4 when parts[2] == "map" && CanOpenMap(module, chatId):
+            case 4 when parts[2] == "map" && CanOpenMap(module):
                 await StartMapFromWizardAsync(module, parts[3], chatId, replies, cancellationToken);
                 break;
 
@@ -389,7 +409,7 @@ public sealed class BotCommandProcessor
             .Select(preset => Button(preset.Label, $"o:{module.Id}:{preset.Key}"))
             .ToList();
 
-        if (CanOpenMap(module, chatId))
+        if (CanOpenMap(module))
             rows.Add(Button("Map: choose places on a real map", $"o:{module.Id}:map"));
 
         rows.Add(Button("Custom", $"o:{module.Id}:custom"));
@@ -464,16 +484,12 @@ public sealed class BotCommandProcessor
 
     // ---- Solving on a map -------------------------------------------------------
     // The map is another way to enter a routing problem, so it lives under the same commands:
-    // "/solve vrp map [solver] ..." and Vehicle routing > Map in /optimize. Either way the
-    // chat only chooses the algorithm; the problem itself is drawn in the browser.
+    // "/solve vrp map [solver] ..." and Vehicle routing > Map in /optimize. The chat only
+    // chooses the algorithm; the places arrive as Telegram location messages, the road
+    // distances are fetched when the user presses Solve, and the job renders the PNG.
 
-    // In a private chat Telegram uses the user's own id as the chat id, and group chats have
-    // negative ids. The map link is a secret, so it is only sent where nobody else can read
-    // it, and in a private chat the chat id is also the id of the user who owns the session.
-    private static bool IsPrivateChat(long chatId) => chatId > 0;
-
-    private bool CanOpenMap(IProblemModule module, long chatId) =>
-        _maps is not null && module is IMapProblemModule && IsPrivateChat(chatId);
+    private bool CanOpenMap(IProblemModule module) =>
+        _routing is not null && module is IMapProblemModule;
 
     private async Task OpenMapAsync(
         SolveCommand command,
@@ -481,10 +497,10 @@ public sealed class BotCommandProcessor
         IBotReplies replies,
         CancellationToken cancellationToken)
     {
-        if (_maps is null)
+        if (_routing is null)
         {
             await replies.SendTextAsync(
-                "The map is not available: this bot is not connected to the map web app.",
+                "The map is not available: this bot has no routing service configured.",
                 cancellationToken);
             return;
         }
@@ -508,19 +524,14 @@ public sealed class BotCommandProcessor
         if (command.InstanceText is not null || command.ParameterValues.Count > 0)
         {
             await replies.SendTextAsync(
-                $"On the map you place the points yourself, so {module.Id} map takes no instance lines or " +
+                $"On the map you send the places yourself, so {module.Id} map takes no instance lines or " +
                 $"settings. Only the solver, iterations= and seed= apply. Example: /solve {module.Id} map ga",
                 cancellationToken);
             return;
         }
 
-        if (!IsPrivateChat(chatId))
-        {
-            await replies.SendTextAsync(PrivateChatOnly, cancellationToken);
-            return;
-        }
-
-        await OpenMapSessionAsync(
+        await StartMapDialogAsync(
+            module,
             new MapSettings(
                 command.Solver,
                 command.Iterations,
@@ -531,31 +542,188 @@ public sealed class BotCommandProcessor
             cancellationToken);
     }
 
-    private const string PrivateChatOnly =
-        "The map link is private, so I only send it in a private chat. Open a chat with me and send the command there.";
-
-    private async Task OpenMapSessionAsync(
+    private async Task StartMapDialogAsync(
+        IProblemModule module,
         MapSettings settings,
         long chatId,
         IBotReplies replies,
         CancellationToken cancellationToken)
     {
-        var link = _maps!.Open(chatId, chatId, replies, settings);
+        var dialog = new MapVrpDialog(_routing!.MaxLocations);
 
-        var minutes = Math.Max(1, (int)Math.Round(link.ValidFor.TotalMinutes));
+        _conversations.Set(chatId, new MapCollecting(module, dialog, settings));
 
         var algorithm = SolverNames.Display(settings.Solver) +
                         (settings.Iterations is { } iterations ? $", {iterations} iterations" : string.Empty);
 
-        // The link goes out in monospace: tap it to copy, then paste it into a browser.
-        await replies.SendTextWithCodeAsync(
-            $"Your routing map is ready ({algorithm}).\nTap the link to copy it, then open it in a browser:\n\n",
-            link.Url,
-            "\n\nPlace the depot, add the customers and their demands, set the trucks and " +
-            "their capacity, then press Solve. I'll send the summary here when it's done.\n\n" +
-            $"The link is yours alone, so don't share it. It stops working after {minutes} minutes " +
-            "if you don't use it. Send /cancel to close it.",
+        await replies.SendTextAsync(
+            $"Routing on a map ({algorithm}).\n\n{dialog.Start()}\n\n(Send /cancel to stop.)",
             cancellationToken);
+    }
+
+    /// <summary>Handles a Telegram location message, which places the next point of a map problem.</summary>
+    public async Task ProcessLocationAsync(
+        double latitude,
+        double longitude,
+        long chatId,
+        IBotReplies replies,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(replies);
+
+        if (_conversations.Get(chatId) is not MapCollecting state)
+        {
+            await replies.SendTextAsync(
+                "I was not expecting a location. To route on a map, send /solve vrp map first.",
+                cancellationToken);
+            return;
+        }
+
+        await ShowMapReplyAsync(state.Dialog.AddLocation(latitude, longitude), replies, cancellationToken);
+    }
+
+    private async Task ContinueMapAsync(
+        MapCollecting state,
+        long chatId,
+        string text,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        if (text.Trim().Equals("solve", StringComparison.OrdinalIgnoreCase) &&
+            state.Dialog.Phase == MapPhase.Ready)
+        {
+            await SolveMapAsync(state, chatId, replies, cancellationToken);
+            return;
+        }
+
+        await ShowMapReplyAsync(state.Dialog.AddText(text), replies, cancellationToken);
+    }
+
+    private async Task ProcessMapButtonAsync(
+        string action,
+        long chatId,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        if (_conversations.Get(chatId) is not MapCollecting state)
+        {
+            await SendStaleAsync(replies, cancellationToken);
+            return;
+        }
+
+        switch (action)
+        {
+            case "done":
+                await ShowMapReplyAsync(state.Dialog.Done(), replies, cancellationToken);
+                break;
+
+            case "undo":
+                await ShowMapReplyAsync(state.Dialog.Undo(), replies, cancellationToken);
+                break;
+
+            case "solve":
+                await SolveMapAsync(state, chatId, replies, cancellationToken);
+                break;
+
+            default:
+                await SendStaleAsync(replies, cancellationToken);
+                break;
+        }
+    }
+
+    private static Task ShowMapReplyAsync(
+        MapReply reply,
+        IBotReplies replies,
+        CancellationToken cancellationToken) =>
+        replies.ShowChoicesAsync(reply.Text, reply.Buttons, cancellationToken);
+
+    // Fetches the road distances, then hands the problem to the job queue; the job solves it and
+    // sends the PNG. The places stay in the chat's conversation until the job is accepted.
+    private async Task SolveMapAsync(
+        MapCollecting state,
+        long chatId,
+        IBotReplies replies,
+        CancellationToken cancellationToken)
+    {
+        if (!state.Dialog.TryBuild(out var input, out var error))
+        {
+            await replies.SendTextAsync(error!, cancellationToken);
+            return;
+        }
+
+        // Replaces the buttons of the pressed message, so Solve cannot be pressed twice.
+        await replies.ShowChoicesAsync("Fetching road distances...", [], cancellationToken);
+
+        var retry = new[] { new[] { new Choice("Try again", MapVrpDialog.SolveData) } };
+
+        VrpCostMatrix costs;
+
+        try
+        {
+            costs = await _routing!.GetCostMatrixAsync(input!.Depot, input.Customers, cancellationToken);
+        }
+        catch (UnreachableRouteException unreachable)
+        {
+            await replies.ShowChoicesAsync(
+                unreachable.Message + " Send a new location for it, or press Undo to remove the last customer.",
+                [[new Choice("Undo", MapVrpDialog.UndoData)]],
+                cancellationToken);
+            return;
+        }
+        catch (RoutingException)
+        {
+            await replies.ShowChoicesAsync(
+                "The routing service could not calculate road distances right now.",
+                retry,
+                cancellationToken);
+            return;
+        }
+        catch (ArgumentException invalid)
+        {
+            await replies.SendTextAsync(invalid.Message, cancellationToken);
+            return;
+        }
+
+        VrpProblem problem;
+
+        try
+        {
+            // Longitude is x and latitude is y, so the problem still knows where its places are.
+            problem = new VrpProblem(
+                input.Depot.Longitude,
+                input.Depot.Latitude,
+                input.Customers.Select((place, index) =>
+                    new VrpCustomer(place.Longitude, place.Latitude, input.Demands[index])),
+                input.Vehicles,
+                input.Capacity,
+                costs);
+        }
+        catch (ArgumentException invalid)
+        {
+            await replies.SendTextAsync(invalid.Message, cancellationToken);
+            return;
+        }
+
+        var instance = new MapVrpInstance(problem, input.Depot, input.Customers, _routing!);
+        var settings = state.Settings;
+
+        _conversations.Clear(chatId);
+
+        var queued = await QueueAsync(
+            new SolveCommand(
+                "map",
+                settings.Solver,
+                Iterations: settings.Iterations,
+                Seed: settings.Seed,
+                Tuning: settings.Tuning),
+            instance,
+            chatId,
+            replies,
+            cancellationToken);
+
+        // Busy or full: keep the places, so Solve can be sent again.
+        if (!queued)
+            _conversations.Set(chatId, state);
     }
 
     private static Task ShowMapAlgorithmsAsync(
@@ -593,7 +761,8 @@ public sealed class BotCommandProcessor
             [],
             cancellationToken);
 
-        await OpenMapSessionAsync(
+        await StartMapDialogAsync(
+            module,
             new MapSettings(solver, null, SolveOptions.DefaultSeed, null),
             chatId,
             replies,
@@ -705,15 +874,6 @@ public sealed class BotCommandProcessor
         }
 
         var result = _queue.Cancel(chatId);
-
-        // With no job left to stop, /cancel closes the map link instead.
-        if (result is null && _maps is not null && IsPrivateChat(chatId) && _maps.Close(chatId))
-        {
-            await replies.SendTextAsync(
-                "Map closed. Send /solve vrp map to open a new one.",
-                cancellationToken);
-            return;
-        }
 
         var message = result switch
         {

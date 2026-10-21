@@ -1,4 +1,5 @@
 using Optinull.Infrastructure.Hosting;
+using Optinull.Infrastructure.Routing;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -11,8 +12,12 @@ if (string.IsNullOrWhiteSpace(token))
         "or the Telegram__BotToken environment variable.");
 }
 
-// This host has no web app, so it has no map: /solve vrp map is only offered by Optinull.Web.
+// Road routing powers /solve vrp map. The public OSRM demo server is for prototyping only;
+// set Osrm:BaseUrl to your own instance for real use.
+var osrm = builder.Configuration.GetSection("Osrm").Get<OsrmOptions>();
+
 builder.Services.AddOptinullEngine();
+builder.Services.AddOptinullRouting(osrm);
 builder.Services.AddOptinullTelegram(token);
 
 var host = builder.Build();

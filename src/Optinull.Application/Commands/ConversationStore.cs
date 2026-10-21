@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Optinull.Application.Maps;
 using Optinull.Application.Problems;
 
 namespace Optinull.Application.Commands;
@@ -8,6 +9,9 @@ internal abstract record Conversation(IProblemModule Module);
 
 /// <summary>The user is answering the guided questions for their own data.</summary>
 internal sealed record Collecting(IProblemModule Module, IProblemDialog Dialog) : Conversation(Module);
+
+/// <summary>The user is sending places for a map problem: the depot, customers, then the fleet.</summary>
+internal sealed record MapCollecting(IProblemModule Module, MapVrpDialog Dialog, MapSettings Settings) : Conversation(Module);
 
 /// <summary>The data is complete; the user still has to pick an algorithm.</summary>
 internal sealed record Ready(IProblemModule Module, IProblemInstance Instance) : Conversation(Module);

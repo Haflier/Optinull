@@ -129,6 +129,18 @@ public sealed class TelegramPoller
 
         try
         {
+            // A location (or a venue, which carries one) places the next point of a map problem.
+            if ((message.Location ?? message.Venue?.Location) is { } location)
+            {
+                await _processor.ProcessLocationAsync(
+                    location.Latitude,
+                    location.Longitude,
+                    chatId,
+                    replies,
+                    cancellationToken);
+                return;
+            }
+
             var text = message.Text;
 
             if (text is null && message.Document is { } document)

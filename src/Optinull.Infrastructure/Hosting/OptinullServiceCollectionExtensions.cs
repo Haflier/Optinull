@@ -2,17 +2,19 @@ using Microsoft.Extensions.DependencyInjection;
 using Optinull.Application.Commands;
 using Optinull.Application.Jobs;
 using Optinull.Application.Problems;
+using Optinull.Application.Routing;
+using Optinull.Infrastructure.Routing;
 using Optinull.Infrastructure.Telegram;
 
 namespace Optinull.Infrastructure.Hosting;
 
-/// <summary>The wiring the bot host and the web host share, so neither repeats it.</summary>
+/// <summary>The wiring of the bot host.</summary>
 public static class OptinullServiceCollectionExtensions
 {
     /// <summary>
     /// The problem registry, the job queue and its workers, and the command processor. A host
-    /// that wants map sessions registers an <c>IMapSessionLauncher</c> as well; the processor
-    /// picks it up when it is there.
+    /// that wants map routing registers an <c>IRoutingClient</c> as well (see
+    /// <see cref="AddOptinullRouting"/>); the processor picks it up when it is there.
     /// </summary>
     public static IServiceCollection AddOptinullEngine(this IServiceCollection services)
     {
@@ -23,6 +25,24 @@ public static class OptinullServiceCollectionExtensions
         services.AddSingleton(new JobExecutor());
         services.AddSingleton<BotCommandProcessor>();
         services.AddHostedService<JobWorker>();
+
+        return services;
+    }
+
+    /// <summary>Registers the OSRM road routing used by /solve vrp map.</summary>
+    public static IServiceCollection AddOptinullRouting(this IServiceCollection services, OsrmOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        // One client for the whole app: it remembers the distance matrices it has already fetched.
+        services.AddSingleton<IRoutingClient>(_ =>
+        {
+            var http = new HttpClient();
+
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Optinull/1.0");
+
+            return new OsrmRoutingClient(http, options);
+        });
 
         return services;
     }
