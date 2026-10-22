@@ -29,4 +29,48 @@ public sealed class RoadRouteChartRendererTests
     [Fact]
     public void Render_WithoutRoutes_Throws() =>
         Assert.Throws<ArgumentException>(() => new RoadRouteChartRenderer().Render(Depot, [], "Routes"));
+
+    [Fact]
+    public void Render_WithTiles_DrawsThemAndTheCredit()
+    {
+        var routes = new[]
+        {
+            new RoadChartRoute([Depot, new(13.41, 52.51), Depot], [new(13.41, 52.51)], "Truck 1")
+        };
+
+        var viewport = MapViewport.Fit(routes.SelectMany(route => route.Line));
+
+        // Any valid PNG will do as a tile.
+        var tile = new RoadRouteChartRenderer().Render(Depot, routes, "tile");
+
+        var plain = new RoadRouteChartRenderer().Render(Depot, routes, "Routes", viewport);
+
+        var withTiles = new RoadRouteChartRenderer().Render(
+            Depot,
+            routes,
+            "Routes",
+            viewport,
+            viewport.Tiles().ToDictionary(t => t, _ => tile),
+            "\u00a9 OpenStreetMap contributors");
+
+        Assert.Equal(PngSignature, withTiles.Take(4).ToArray());
+        Assert.NotEqual(plain, withTiles);
+    }
+
+    [Fact]
+    public void Render_WithATileThatIsNotAnImage_StillRenders()
+    {
+        var routes = new[] { new RoadChartRoute([Depot, new(13.41, 52.51)], [new(13.41, 52.51)], "Truck 1") };
+        var viewport = MapViewport.Fit(routes.SelectMany(route => route.Line));
+
+        var bytes = new RoadRouteChartRenderer().Render(
+            Depot,
+            routes,
+            "Routes",
+            viewport,
+            viewport.Tiles().ToDictionary(t => t, _ => new byte[] { 1, 2, 3 }),
+            "credit");
+
+        Assert.Equal(PngSignature, bytes.Take(4).ToArray());
+    }
 }

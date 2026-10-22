@@ -2,6 +2,7 @@ using Optinull.Application.Commands;
 using Optinull.Application.Jobs;
 using Optinull.Application.Optimization;
 using Optinull.Application.Routing;
+using Optinull.Reporting.Charts;
 
 namespace Optinull.Application.Tests.Maps;
 
@@ -153,6 +154,64 @@ public sealed class MapCommandTests
 
         var routes = Assert.Single(replies.Pngs, png => png.FileName == "map-routes.png");
         Assert.Contains("straight lines", routes.Caption);
+    }
+
+    [Fact]
+    public async Task WithTiles_TheMapIsDrawnOverThem_AndTheCaptionStaysClean()
+    {
+        var routing = new FakeRouting();
+        var depot = new RoutePoint(13.40, 52.50);
+
+        // Any valid PNG will do as a tile.
+        var image = new RoadRouteChartRenderer().Render(
+            depot,
+            [new RoadChartRoute([depot, new(13.41, 52.51)], [new(13.41, 52.51)], "x")],
+            "tile");
+
+        var tiles = new FakeTiles(image);
+        var queue = new JobQueue();
+        var processor = new BotCommandProcessor(queue, null, null, routing, tiles);
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync("/solve vrp map greedy", 7, replies);
+        await processor.ProcessAsync("52.50, 13.40\n52.51, 13.41\ndone\n1 5", 7, replies);
+        await processor.ProcessCallbackAsync("m:solve", 7, replies);
+
+        Assert.True(queue.Reader.TryRead(out var job));
+
+        await new JobExecutor().ExecuteAsync(job!);
+
+        Assert.Equal(JobStatus.Completed, job!.Status);
+        Assert.True(tiles.Calls > 0);
+
+        var routes = Assert.Single(replies.Pngs, png => png.FileName == "map-routes.png");
+        Assert.DoesNotContain("background", routes.Caption);
+    }
+
+    [Fact]
+    public async Task WhenTilesAreMissing_TheMapIsStillSent_AndTheCaptionSaysSo()
+    {
+        var routing = new FakeRouting();
+        var tiles = new FakeTiles(null);
+        var queue = new JobQueue();
+        var processor = new BotCommandProcessor(queue, null, null, routing, tiles);
+        var replies = new FakeReplies();
+
+        await processor.ProcessAsync("/solve vrp map greedy", 7, replies);
+        await processor.ProcessAsync("52.50, 13.40\n52.51, 13.41\ndone\n1 5", 7, replies);
+        await processor.ProcessCallbackAsync("m:solve", 7, replies);
+
+        Assert.True(queue.Reader.TryRead(out var job));
+
+        await new JobExecutor().ExecuteAsync(job!);
+
+        Assert.Equal(JobStatus.Completed, job!.Status);
+
+        // It gives up after a few failures instead of waiting on every tile.
+        Assert.Equal(3, tiles.Calls);
+
+        var routes = Assert.Single(replies.Pngs, png => png.FileName == "map-routes.png");
+        Assert.Contains("Map background incomplete", routes.Caption);
     }
 
     [Fact]
