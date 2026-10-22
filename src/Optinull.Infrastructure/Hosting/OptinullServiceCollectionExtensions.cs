@@ -29,8 +29,11 @@ public static class OptinullServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>Registers the OSRM road routing used by /solve vrp map.</summary>
-    public static IServiceCollection AddOptinullRouting(this IServiceCollection services, OsrmOptions? options = null)
+    /// <summary>Registers the OSRM road routing and the map tiles used by /solve vrp map.</summary>
+    public static IServiceCollection AddOptinullRouting(
+        this IServiceCollection services,
+        OsrmOptions? options = null,
+        MapTileOptions? tileOptions = null)
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -42,6 +45,16 @@ public static class OptinullServiceCollectionExtensions
             http.DefaultRequestHeaders.UserAgent.ParseAdd("Optinull/1.0");
 
             return new OsrmRoutingClient(http, options);
+        });
+
+        // One client for the whole app, so the tile cache is shared by every chat.
+        services.AddSingleton<IMapTileClient>(_ =>
+        {
+            var http = new HttpClient();
+
+            http.DefaultRequestHeaders.UserAgent.ParseAdd((tileOptions ?? new MapTileOptions()).UserAgent);
+
+            return new HttpMapTileClient(http, tileOptions);
         });
 
         return services;

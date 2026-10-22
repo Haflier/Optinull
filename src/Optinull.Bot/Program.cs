@@ -17,7 +17,12 @@ if (string.IsNullOrWhiteSpace(token))
 var osrm = builder.Configuration.GetSection("Osrm").Get<OsrmOptions>();
 
 builder.Services.AddOptinullEngine();
-builder.Services.AddOptinullRouting(osrm);
+
+// Street tiles behind the routes. The default is the public OpenStreetMap server (light use only);
+// set MapTiles:UrlTemplate and MapTiles:Attribution to use another source.
+var tiles = builder.Configuration.GetSection("MapTiles").Get<MapTileOptions>();
+
+builder.Services.AddOptinullRouting(osrm, tiles);
 builder.Services.AddOptinullTelegram(token);
 
 var host = builder.Build();
