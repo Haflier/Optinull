@@ -116,14 +116,18 @@ Everything happens in the chat, and the bot is the only host:
 3. Press Done, then send the number of trucks and the capacity of one truck, for example `3 20`.
 4. Press Solve. The bot fetches road distances, solves the problem in the background on the job queue, and sends a PNG with every truck's route along the roads (numbered stops, one colour per truck, load and distance) plus the convergence chart.
 
-`/cancel` stops the dialog or the running job. The PNG is drawn on a plain background without street tiles. If the road shape of a truck cannot be loaded, that truck is drawn as straight lines and the caption says so.
+`/cancel` stops the dialog or the running job. The PNG is drawn over OpenStreetMap tiles (with the required credit). If the road shape of a truck cannot be loaded, that truck is drawn as straight lines, and if tiles cannot be loaded the background is plain; the caption says so in both cases.
 
-Routing uses the public OSRM demo server by default, which is for prototyping only. Point `Osrm:BaseUrl` at your own instance for real use:
+Routing uses the public OSRM demo server and the background uses the public OpenStreetMap tile server by default. Both are for light use only. For real use, point them at your own or a commercial service:
 
 ```bash
 export Osrm__BaseUrl="https://<your osrm server>"
+export MapTiles__UrlTemplate="https://<tile server>/{z}/{x}/{y}.png"
+export MapTiles__Attribution="<the credit your tile provider requires>"
 dotnet run --project src/Optinull.Bot
 ```
+
+An empty `MapTiles__UrlTemplate` turns the background off.
 
 ## Test
 
