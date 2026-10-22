@@ -15,16 +15,19 @@ public sealed class BotCommandProcessor
     private readonly ProblemRegistry _registry;
     private readonly ConversationStore _conversations;
     private readonly IRoutingClient? _routing;
+    private readonly IMapTileClient? _tiles;
 
     /// <param name="routing">
     /// Road distances and shapes. Without it the bot has no map: /solve vrp map is refused and
     /// the wizard does not offer Map.
     /// </param>
+    /// <param name="tiles">Street tiles for the background of the route map. Without it the map is plain.</param>
     public BotCommandProcessor(
         JobQueue queue,
         ProblemRegistry? registry = null,
         TimeProvider? timeProvider = null,
-        IRoutingClient? routing = null)
+        IRoutingClient? routing = null,
+        IMapTileClient? tiles = null)
     {
         ArgumentNullException.ThrowIfNull(queue);
 
@@ -32,6 +35,7 @@ public sealed class BotCommandProcessor
         _registry = registry ?? ProblemRegistry.CreateDefault();
         _conversations = new ConversationStore(timeProvider ?? TimeProvider.System);
         _routing = routing;
+        _tiles = tiles;
     }
 
     public string StartText
@@ -704,7 +708,7 @@ public sealed class BotCommandProcessor
             return;
         }
 
-        var instance = new MapVrpInstance(problem, input.Depot, input.Customers, _routing!);
+        var instance = new MapVrpInstance(problem, input.Depot, input.Customers, _routing!, _tiles);
         var settings = state.Settings;
 
         _conversations.Clear(chatId);

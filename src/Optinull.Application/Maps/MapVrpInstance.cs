@@ -19,12 +19,14 @@ internal sealed class MapVrpInstance : IProblemInstance
     private readonly GeoPoint _depot;
     private readonly IReadOnlyList<GeoPoint> _customers;
     private readonly IRoutingClient _routing;
+    private readonly IMapTileClient? _tiles;
 
     public MapVrpInstance(
         VrpProblem problem,
         GeoPoint depot,
         IReadOnlyList<GeoPoint> customers,
-        IRoutingClient routing)
+        IRoutingClient routing,
+        IMapTileClient? tiles = null)
     {
         ArgumentNullException.ThrowIfNull(problem);
         ArgumentNullException.ThrowIfNull(customers);
@@ -34,6 +36,7 @@ internal sealed class MapVrpInstance : IProblemInstance
         _depot = depot;
         _customers = customers;
         _routing = routing;
+        _tiles = tiles;
     }
 
     public string Name => "map";
@@ -107,10 +110,16 @@ internal sealed class MapVrpInstance : IProblemInstance
                 $"Truck {index + 1}: {route.Count} stops, load {load}/{_problem.Capacity}, {km:0.#} km"));
         }
 
+        var viewport = MapViewport.Fit(routes.SelectMany(route => route.Line).Append(Point(_depot)));
+        var tiles = FetchTiles(viewport, out var wanted, cancellationToken);
+
         var map = new RoadRouteChartRenderer().Render(
             Point(_depot),
             routes,
-            $"{result.SolverName}: {result.Distance / 1000:0.0} km, {result.Plan.RouteCount} trucks");
+            $"{result.SolverName}: {result.Distance / 1000:0.0} km, {result.Plan.RouteCount} trucks",
+            viewport,
+            tiles,
+            _tiles?.Attribution);
 
         var convergence = new ConvergenceChartRenderer().Render(
             [ReportMapper.ToConvergenceSeries(result.SolverName, result.Search)],
@@ -118,12 +127,12 @@ internal sealed class MapVrpInstance : IProblemInstance
 
         return
         [
-            new ReportImage("map-routes.png", Caption(result, straight), map),
+            new ReportImage("map-routes.png", Caption(result, straight, wanted - tiles.Count), map),
             new ReportImage("map-convergence.png", "Convergence", convergence)
         ];
     }
 
-    private string Caption(VrpSolveResult result, int straight)
+    private string Caption(VrpSolveResult result, int straight, int missingTiles)
     {
         var text = $"map | {result.SolverName} | {result.Distance / 1000:0.0} km, " +
                    $"{result.Plan.RouteCount} of {_problem.Vehicles} trucks";
@@ -137,7 +146,45 @@ internal sealed class MapVrpInstance : IProblemInstance
         if (straight > 0)
             text += $"\n{straight} truck(s) drawn as straight lines: the road shape could not be loaded.";
 
+        if (_tiles is not null && missingTiles > 0)
+            text += $"\nMap background incomplete: {missingTiles} tile(s) could not be loaded.";
+
         return text;
+    }
+
+    // One tile after another, as the tile policy asks. After a few failures in a row it stops
+    // trying: the picture is still drawn, just with a plainer background.
+    private Dictionary<MapTile, byte[]> FetchTiles(
+        MapViewport viewport,
+        out int wanted,
+        CancellationToken cancellationToken)
+    {
+        var found = new Dictionary<MapTile, byte[]>();
+        var failures = 0;
+
+        wanted = 0;
+
+        if (_tiles is null)
+            return found;
+
+        foreach (var tile in viewport.Tiles())
+        {
+            wanted++;
+
+            if (failures >= 3)
+                continue;
+
+            var bytes = _tiles.GetTileAsync(tile.Zoom, tile.X, tile.Y, cancellationToken)
+                .GetAwaiter()
+                .GetResult();
+
+            if (bytes is null)
+                failures++;
+            else
+                found[tile] = bytes;
+        }
+
+        return found;
     }
 
     // Longitude is x and latitude is y.
