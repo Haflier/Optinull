@@ -473,7 +473,11 @@ The screenshots below show Optinull's Telegram interface, optimization results, 
     <td align="center"><img src="images/screenshots/theory-vrp-compare.webp" alt="Vehicle routing solver comparison" width="440"><br><sub>Vehicle routing comparison</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="images/screenshots/tsp-compare-conv.webp" alt="TSP solver comparison and convergence" width="440"><br><sub>TSP comparison and convergence</sub></td>
+    <td align="center"><img src="images/screenshots/knapsack-overview.webp" alt="Knapsack overview" width="440"><br><sub>Knapsack overview</sub></td>
+    <td align="center"><img src="images/screenshots/jobshop-overview.webp" alt="JobShop overview" width="440"><br><sub>JobShop overview</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/screenshots/jobshop-compare-conv.webp" alt="JobShop solver comparison and convergence" width="440"><br><sub>JobShop comparison and convergence</sub></td>
     <td align="center"><img src="images/screenshots/tsp-overview.webp" alt="TSP overview" width="440"><br><sub>TSP overview</sub></td>
   </tr>
 </table>
