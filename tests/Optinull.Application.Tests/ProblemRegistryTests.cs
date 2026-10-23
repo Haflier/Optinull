@@ -12,6 +12,7 @@ public sealed class ProblemRegistryTests
         Assert.NotNull(registry.FindModule("jobshop"));
         Assert.NotNull(registry.FindModule("TSP"));
         Assert.NotNull(registry.FindModule("knapsack"));
+        Assert.NotNull(registry.FindModule("binpacking"));
         Assert.Null(registry.FindModule("sudoku"));
     }
 

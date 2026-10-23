@@ -95,7 +95,7 @@ Solver keywords:
 - `ga` — Genetic Algorithm
 - `all` — run all five solvers; `/compare` is an equivalent explicit command
 
-The problem argument can be a built-in instance name (`ft06`, `circle20`, `knap20`, `vrp15`, and so on) or a problem type (`jobshop`, `tsp`, `knapsack`, `vrp`). A problem type can be followed by custom instance text or by parameters to generate a random instance.
+The problem argument can be a built-in instance name (`ft06`, `circle20`, `knap20`, `vrp15`, and so on) or a problem type (`jobshop`, `tsp`, `knapsack`, `vrp`, `binpacking`). A problem type can be followed by custom instance text or by parameters to generate a random instance.
 
 ### Examples
 
@@ -140,6 +140,7 @@ The parser accepts iteration aliases `iteration`, `iter`, and `it`. Tuning alias
 | `tsp` | Minimize tour length | `circle20`, `grid8`, `random50` | `cities` |
 | `knapsack` | Maximize total value | `knap20`, `knap100` | `items` |
 | `vrp` | Minimize total distance | `vrp15`, `vrp40` | `customers`, `vehicles` |
+| `binpacking` | Minimize number of bins | `bin30`, `bin120` | `items`, `capacity`, `minsize`, `maxsize` |
 
 ### Job Shop Scheduling
 
@@ -194,6 +195,27 @@ Generate a random instance:
 ```
 
 Custom input supports up to 100 items, capacity up to 100,000, item values up to 100,000, and input text up to 20,000 characters. Capacity, values, and weights are whole numbers; weights must be positive.
+
+### Bin Packing
+
+Pack items into as few identical bins as possible without any bin going over its capacity. Typical uses: cutting stock bars, loading trucks or containers by weight, placing virtual machines on servers, filling backup discs. Every item must fit in an empty bin.
+
+Built-in instances:
+
+- `bin30` — 30 items, bin capacity 100
+- `bin120` — 120 items, bin capacity 100
+
+Generate a random instance; every setting can be changed:
+
+```text
+/solve binpacking items=60 capacity=100 minsize=10 maxsize=50 seed=42
+```
+
+`minsize` defaults to a tenth of the capacity and `maxsize` to half of it, so `capacity=20` alone is still a sensible instance. `maxsize` cannot exceed the capacity.
+
+The score is the number of bins. No packing can use fewer than the total size divided by the capacity, rounded up, so a result at that lower bound is optimal; the chart caption reports it. While searching, the solvers minimize the bin count plus a fraction below one that rewards uneven fill (it leads toward emptying a bin), so the convergence chart shows that smoothed value. The greedy baseline is first-fit decreasing.
+
+Custom input supports up to 200 items in total, capacity up to 100,000, and input text up to 20,000 characters.
 
 ### Vehicle Routing (VRP)
 
@@ -322,6 +344,20 @@ The first line is the positive integer capacity. Each following line contains on
 
 In this example, the solver chooses a subset whose total weight is at most 50 and whose total value is as large as possible.
 
+### Bin packing format
+
+The first line is the capacity of one bin. Each following line is one kind of item as `size` or `size quantity` (the quantity defaults to 1 and counts toward the 200-item limit). Sizes are whole numbers and cannot exceed the capacity.
+
+```text
+/solve binpacking ga
+6000
+2400 3
+1800 5
+1200 8
+```
+
+Here the bars are 6000 long and the solver cuts 3 + 5 + 8 pieces from as few bars as possible.
+
 ### Vehicle routing format
 
 The first line is `vehicles capacity`, the second line is the depot as `x y`, and every following line is one customer as `x y demand`. Demands are whole numbers from 1 up to the capacity; coordinates may be decimal (with a dot).
@@ -345,21 +381,21 @@ Attach a `.txt` file to a Telegram message and put the command in the caption, f
 /solve jobshop sa
 ```
 
-Use the matching problem id (`jobshop`, `tsp`, `knapsack`, or `vrp`) and follow that problem's input format. The application also has a 30 KB file-attachment limit.
+Use the matching problem id (`jobshop`, `tsp`, `knapsack`, `vrp`, or `binpacking`) and follow that problem's input format. The application also has a 30 KB file-attachment limit.
 
 ## How results are reported
 
 A completed run can include:
 
-- **Score:** makespan, tour length, total knapsack value, or total route distance, depending on the problem.
+- **Score:** makespan, tour length, total knapsack value, total route distance, or number of bins, depending on the problem.
 - **Improvement over greedy:** a relative comparison against the Greedy baseline when that comparison is defined.
 - **Convergence chart:** how the recorded best score changed during search.
-- **Problem-specific chart:** a Gantt chart for job shop, a route plot for TSP, selected/unselected items for knapsack, or one coloured route per vehicle (with its load) for vehicle routing.
+- **Problem-specific chart:** a Gantt chart for job shop, a route plot for TSP, selected/unselected items for knapsack, stacked bins for bin packing, or one coloured route per vehicle (with its load) for vehicle routing.
 - **Comparison summary:** relative solver results, elapsed time, evaluation count, and best-result/tie information.
 - **Settings used:** a single run lists every setting its solver used, each marked `(auto)` when the engine chose it and `(yours)` when you set it, for example `Settings: population=22 (auto), elite=2 (auto), mutation=0.3 (yours), tournament=3 (auto), localsearch=10 (auto)`. Greedy and Hill Climbing have no settings to list.
 - **Settings in a comparison:** the comparison summary lists only the settings you set, each tagged with the solver it was applied to, for example `Settings: temperature=2 (SA), mutation=0.3 (GA)`.
 
-The objective direction differs by problem: lower is better for makespan, tour length, and total route distance; higher is better for knapsack value. Always compare scores within the same problem instance and objective.
+The objective direction differs by problem: lower is better for makespan, tour length, total route distance, and number of bins; higher is better for knapsack value. Always compare scores within the same problem instance and objective.
 
 ## Architecture
 
@@ -369,7 +405,7 @@ Optinull uses a layered design. Telegram-specific code is kept at the edge; prob
 Optinull.Bot
   ├── Optinull.Infrastructure       Telegram polling and replies
   └── Optinull.Application          Commands, dialogs, registry, queue, execution
-        ├── Optinull.Problems        Job Shop, TSP, Knapsack, Vehicle Routing
+        ├── Optinull.Problems        Job Shop, TSP, Knapsack, Vehicle Routing, Bin Packing
         ├── Optinull.Optimization    Search algorithms and shared search abstractions
         ├── Optinull.Reporting       Chart rendering
         └── Optinull.Domain          Core optimization model
@@ -382,7 +418,7 @@ Optinull.Bot
 | `Optinull.Domain` | Optimization model: variables, expressions, constraints, objectives, solutions, and evaluation |
 | `Optinull.Optimization` | Problem-independent search algorithms, neighborhoods, random solution generation, comparisons, and seeded randomness |
 | `Optinull.Problems` | Concrete problem representations, evaluators, parsers, benchmark instances, random generators, and experiment support |
-| `Optinull.Reporting` | PNG chart rendering for convergence, comparisons, schedules, routes, vehicle routes, and knapsack selections |
+| `Optinull.Reporting` | PNG chart rendering for convergence, comparisons, schedules, routes, vehicle routes, knapsack selections, and bin packings |
 | `Optinull.Application` | Telegram command parsing, guided dialogs, problem registry, bounded job queue, job execution, and comparison orchestration |
 | `Optinull.Infrastructure` | Telegram polling and sending text/photo replies |
 | `Optinull.Bot` | .NET Worker Service host and dependency-injection composition root |
@@ -488,14 +524,14 @@ The README tracks these project-level next steps:
 
 - [ ] CI pipeline and container image
 - [ ] Persistent job and conversation storage
-- [ ] Additional problem types, such as bin packing
+- [ ] Additional problem types, such as scheduling with deadlines
 - [ ] Calibrate the automatic solver settings from the tuning sweeps
 
 Already implemented:
 
 - [x] Domain model with expression-based constraints and objectives
 - [x] Greedy, Hill Climbing, Iterated Local Search, Simulated Annealing, and Genetic Algorithm
-- [x] Job Shop, TSP, Knapsack, and Vehicle Routing with benchmarks, parsers, and random generators
+- [x] Job Shop, TSP, Knapsack, Vehicle Routing, and Bin Packing with benchmarks, parsers, and random generators
 - [x] Telegram `/optimize`, `/solve`, `/compare`, and `/cancel` flows
 - [x] Convergence and problem-specific charts
 - [x] Progress tracking, cancellation, time limits, and per-chat job limits

@@ -29,12 +29,12 @@ Optinull is an optimization engine written in C# / .NET with a Telegram bot as i
 ## Features
 
 - **Five search strategies:** Greedy, Hill Climbing, Iterated Local Search, Simulated Annealing, and Genetic Algorithm.
-- **Four optimization problems:** Job Shop Scheduling, Traveling Salesman Problem (TSP), 0/1 Knapsack, and Capacitated Vehicle Routing.
+- **Five optimization problems:** Job Shop Scheduling, Traveling Salesman Problem (TSP), 0/1 Knapsack, Capacitated Vehicle Routing, and Bin Packing.
 - **Comparable runs:** compare solvers on the same instance with the same seed and evaluation budget.
 - **Reproducible experiments:** specify a seed; the default is `42`.
 - **Interactive and direct workflows:** use `/optimize` for a guided flow or `/solve` for command-driven runs.
 - **Automatic settings, optional overrides:** the engine chooses solver settings for each problem and evaluation budget; override any of them from chat, and every result lists the settings it used.
-- **Visual results:** convergence and comparison charts, job-shop schedules, TSP routes, knapsack selections, and vehicle routes.
+- **Visual results:** convergence and comparison charts, job-shop schedules, TSP routes, knapsack selections, vehicle routes, and bin packings.
 - **Bounded execution:** queued jobs, one active job per chat, cancellation, input limits, and a 60-second job timeout.
 
 ## Supported problems
@@ -45,6 +45,7 @@ Optinull is an optimization engine written in C# / .NET with a Telegram bot as i
 | Traveling Salesman Problem | Minimize tour length | `circle20`, `grid8`, `random50` | `cities=20` |
 | 0/1 Knapsack | Maximize total value | `knap20`, `knap100` | `items=30` |
 | Vehicle Routing (CVRP) | Minimize total distance | `vrp15`, `vrp40` | `customers=20 vehicles=4` |
+| Bin Packing | Minimize number of bins | `bin30`, `bin120` | `items=40 capacity=100 minsize=10 maxsize=50` |
 
 The job-shop benchmarks have known optimal makespans of **55** (`ft06`) and **930** (`ft10`). These values are reference optima, not a guarantee that every heuristic run will find them.
 
