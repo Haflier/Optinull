@@ -8,7 +8,8 @@ using TelegramBotCommand = global::Telegram.Bot.Types.BotCommand;
 
 namespace Optinull.Infrastructure.Telegram;
 
-public sealed record TelegramBotOptions(string Token);
+/// <param name="Http">Only tests set this, to put a fake Telegram behind the client.</param>
+public sealed record TelegramBotOptions(string Token, HttpClient? Http = null);
 
 /// <summary>Long-polls Telegram and hands messages to the command processor.</summary>
 public sealed class TelegramPoller
@@ -30,7 +31,7 @@ public sealed class TelegramPoller
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(options.Token);
 
-        _client = new TelegramBotClient(options.Token);
+        _client = new TelegramBotClient(options.Token, options.Http);
         _processor = processor;
         _logger = logger;
     }
