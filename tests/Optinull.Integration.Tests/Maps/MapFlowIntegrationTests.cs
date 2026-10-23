@@ -1,11 +1,7 @@
-using System.Collections.Concurrent;
-using System.Globalization;
-using System.Net;
-using System.Text;
 using Optinull.Application.Commands;
 using Optinull.Application.Jobs;
 using Optinull.Infrastructure.Routing;
-using Optinull.Reporting.Charts;
+using Optinull.Integration.Tests.Support;
 
 namespace Optinull.Integration.Tests.Maps;
 
@@ -15,137 +11,6 @@ namespace Optinull.Integration.Tests.Maps;
 /// </summary>
 public sealed class MapFlowIntegrationTests
 {
-    // Six places about 5 km apart, so the picture needs several tiles.
-    private const string Places =
-        "52.50, 13.40\n" +
-        "52.52, 13.37 4\n" +
-        "52.54, 13.41 5\n" +
-        "52.53, 13.45 3\n" +
-        "52.49, 13.44 4\n" +
-        "52.48, 13.38 3\n" +
-        "52.51, 13.34 4\n" +
-        "done\n" +
-        "2 14";
-
-    private sealed class World : HttpMessageHandler
-    {
-        public World(byte[] tile) => Tile = tile;
-
-        public byte[] Tile { get; }
-
-        public bool TilesDown { get; set; }
-
-        public bool TableDown { get; set; }
-
-        public bool RouteDown { get; set; }
-
-        public ConcurrentQueue<Uri> TileRequests { get; } = new();
-
-        public ConcurrentQueue<Uri> Tables { get; } = new();
-
-        public ConcurrentQueue<Uri> Routes { get; } = new();
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var uri = request.RequestUri!;
-
-            if (uri.Host == "tiles.test")
-            {
-                TileRequests.Enqueue(uri);
-
-                return Task.FromResult(TilesDown
-                    ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
-                    : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Tile) });
-            }
-
-            // OSRM: /table/v1/driving/lon,lat;lon,lat?... or /route/v1/driving/lon,lat;lon,lat?...
-            var parts = uri.AbsolutePath.Trim('/').Split('/');
-
-            var points = parts[3]
-                .Split(';')
-                .Select(pair => pair.Split(','))
-                .Select(pair => (
-                    Lon: double.Parse(pair[0], CultureInfo.InvariantCulture),
-                    Lat: double.Parse(pair[1], CultureInfo.InvariantCulture)))
-                .ToArray();
-
-            if (parts[0] == "table")
-            {
-                Tables.Enqueue(uri);
-
-                return Task.FromResult(TableDown ? Down() : Json(Table(points)));
-            }
-
-            Routes.Enqueue(uri);
-
-            return Task.FromResult(RouteDown ? Down() : Json(Route(points)));
-        }
-
-        private static HttpResponseMessage Down() =>
-            new(HttpStatusCode.ServiceUnavailable)
-            {
-                Content = new StringContent("""{"code":"Error","message":"down"}""", Encoding.UTF8, "application/json")
-            };
-
-        private static HttpResponseMessage Json(string body) =>
-            new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-
-        private static double Meters((double Lon, double Lat) a, (double Lon, double Lat) b) =>
-            Math.Sqrt(Math.Pow(a.Lat - b.Lat, 2) + Math.Pow(a.Lon - b.Lon, 2)) * 111_000;
-
-        private static string Table((double Lon, double Lat)[] points)
-        {
-            var rows = points.Select(from => "[" + string.Join(",", points.Select(to =>
-                Meters(from, to).ToString("0.##", CultureInfo.InvariantCulture))) + "]");
-
-            return $$"""{"code":"Ok","distances":[{{string.Join(",", rows)}}]}""";
-        }
-
-        private static string Route((double Lon, double Lat)[] points)
-        {
-            var coordinates = string.Join(",", points.Select(point =>
-                $"[{point.Lon.ToString(CultureInfo.InvariantCulture)},{point.Lat.ToString(CultureInfo.InvariantCulture)}]"));
-
-            var meters = points.Zip(points.Skip(1), Meters).Sum().ToString("0.##", CultureInfo.InvariantCulture);
-
-            return $$$"""{"code":"Ok","routes":[{"distance":{{{meters}}},"duration":600,"geometry":{"coordinates":[{{{coordinates}}}]}}]}""";
-        }
-    }
-
-    private sealed class CapturingReplies : IBotReplies
-    {
-        private readonly ConcurrentQueue<string> _texts = new();
-        private readonly ConcurrentQueue<(string FileName, string Caption, int Length)> _pngs = new();
-        private readonly ConcurrentQueue<(string Text, IReadOnlyList<Choice> Choices)> _choices = new();
-
-        public IReadOnlyList<string> Texts => _texts.ToArray();
-
-        public IReadOnlyList<(string FileName, string Caption, int Length)> Pngs => _pngs.ToArray();
-
-        public IReadOnlyList<(string Text, IReadOnlyList<Choice> Choices)> Choices => _choices.ToArray();
-
-        public Task SendTextAsync(string text, CancellationToken cancellationToken)
-        {
-            _texts.Enqueue(text);
-            return Task.CompletedTask;
-        }
-
-        public Task SendPngAsync(byte[] png, string fileName, string caption, CancellationToken cancellationToken)
-        {
-            _pngs.Enqueue((fileName, caption, png.Length));
-            return Task.CompletedTask;
-        }
-
-        public Task ShowChoicesAsync(
-            string text,
-            IReadOnlyList<IReadOnlyList<Choice>> rows,
-            CancellationToken cancellationToken)
-        {
-            _choices.Enqueue((text, rows.SelectMany(row => row).ToList()));
-            return Task.CompletedTask;
-        }
-    }
-
     private sealed class Bot
     {
         public Bot(World world)
@@ -175,7 +40,7 @@ public sealed class MapFlowIntegrationTests
         public async Task EnterAsync(long chat = 1)
         {
             await Processor.ProcessAsync("/solve vrp map greedy", chat, Replies);
-            await Processor.ProcessAsync(Places, chat, Replies);
+            await Processor.ProcessAsync(World.Places, chat, Replies);
         }
 
         public Task PressSolveAsync(long chat = 1) =>
@@ -191,23 +56,10 @@ public sealed class MapFlowIntegrationTests
         }
     }
 
-    private static World NewWorld()
-    {
-        // Any valid PNG will do as a tile.
-        var depot = new RoutePoint(13.40, 52.50);
-
-        var tile = new RoadRouteChartRenderer().Render(
-            depot,
-            [new RoadChartRoute([depot, new(13.41, 52.51)], [new(13.41, 52.51)], "tile")],
-            "tile");
-
-        return new World(tile);
-    }
-
     [Fact]
     public async Task FromLocationsToAPngOnAMap()
     {
-        var world = NewWorld();
+        var world = World.Create();
         var bot = new Bot(world);
 
         await bot.EnterAsync();
@@ -234,14 +86,14 @@ public sealed class MapFlowIntegrationTests
     [Fact]
     public async Task AMapWithTiles_IsNotTheSameImageAsOneWithout()
     {
-        var withTiles = NewWorld();
+        var withTiles = World.Create();
         var botWith = new Bot(withTiles);
 
         await botWith.EnterAsync();
         await botWith.PressSolveAsync();
         await botWith.RunQueuedJobAsync();
 
-        var without = NewWorld();
+        var without = World.Create();
         var botWithout = new Bot(without);
 
         without.TilesDown = true;
@@ -258,7 +110,7 @@ public sealed class MapFlowIntegrationTests
     [Fact]
     public async Task WhenTheTileServerIsDown_TheMapIsStillSent_AfterThreeTries()
     {
-        var world = NewWorld();
+        var world = World.Create();
 
         world.TilesDown = true;
 
@@ -280,7 +132,7 @@ public sealed class MapFlowIntegrationTests
     [Fact]
     public async Task WhenTheRoadShapeIsDown_TheTrucksAreDrawnAsStraightLines()
     {
-        var world = NewWorld();
+        var world = World.Create();
 
         world.RouteDown = true;
 
@@ -302,7 +154,7 @@ public sealed class MapFlowIntegrationTests
     [Fact]
     public async Task WhenTheDistanceServiceIsDown_NothingIsQueued_AndTryAgainWorks()
     {
-        var world = NewWorld();
+        var world = World.Create();
 
         world.TableDown = true;
 
@@ -327,7 +179,7 @@ public sealed class MapFlowIntegrationTests
     [Fact]
     public async Task SolvingTheSamePlacesAgain_ReusesTheMatrixAndTheTiles()
     {
-        var world = NewWorld();
+        var world = World.Create();
         var bot = new Bot(world);
 
         await bot.EnterAsync();
@@ -348,13 +200,12 @@ public sealed class MapFlowIntegrationTests
     [Fact]
     public async Task TwoChatsCanBuildTheirOwnMaps_AtTheSameTime()
     {
-        var world = NewWorld();
-        var bot = new Bot(world);
+        var bot = new Bot(World.Create());
 
         await bot.Processor.ProcessAsync("/solve vrp map greedy", 1, bot.Replies);
         await bot.Processor.ProcessAsync("/solve vrp map greedy", 2, bot.Replies);
 
-        await bot.Processor.ProcessAsync(Places, 1, bot.Replies);
+        await bot.Processor.ProcessAsync(World.Places, 1, bot.Replies);
         await bot.Processor.ProcessAsync("52.50, 13.40\n52.51, 13.41\ndone\n1 5", 2, bot.Replies);
 
         await bot.PressSolveAsync(1);
@@ -369,5 +220,74 @@ public sealed class MapFlowIntegrationTests
         Assert.Equal(JobStatus.Completed, first!.Status);
         Assert.Equal(JobStatus.Completed, second!.Status);
         Assert.Equal(2, bot.Replies.Pngs.Count(png => png.FileName == "map-routes.png"));
+    }
+
+    // ---- A busy chat, and cancelling
+
+    [Fact]
+    public async Task WhenTheChatIsBusy_SolveIsRefused_AndThePlacesAreKeptForLater()
+    {
+        var bot = new Bot(World.Create());
+
+        // The first map's job waits in the queue, so the chat counts as busy.
+        await bot.EnterAsync();
+        await bot.PressSolveAsync();
+
+        await bot.EnterAsync();
+        await bot.PressSolveAsync();
+
+        Assert.Contains(bot.Replies.Texts, text => text.Contains("already have job #1"));
+
+        Assert.True(bot.Queue.Reader.TryRead(out var first));
+        Assert.False(bot.Queue.Reader.TryRead(out _));
+
+        await new JobExecutor().ExecuteAsync(first!);
+
+        Assert.Equal(JobStatus.Completed, first!.Status);
+
+        // The second map was not lost: Solve works now without entering the places again.
+        await bot.PressSolveAsync();
+
+        var second = await bot.RunQueuedJobAsync();
+
+        Assert.Equal(JobStatus.Completed, second.Status);
+        Assert.Equal(2, bot.Replies.Pngs.Count(png => png.FileName == "map-routes.png"));
+    }
+
+    [Fact]
+    public async Task CancellingWhileTheTilesLoad_StopsTheJob_SendsNoMap_AndFreesTheChat()
+    {
+        var world = World.Create();
+
+        world.TilesBlock = true;
+
+        var bot = new Bot(world);
+
+        await bot.EnterAsync();
+        await bot.PressSolveAsync();
+
+        Assert.True(bot.Queue.Reader.TryRead(out var job));
+
+        var run = new JobExecutor().ExecuteAsync(job!);
+
+        await Waiting.UntilAsync(() => !world.TileRequests.IsEmpty, "the first tile to be requested");
+
+        await bot.Processor.ProcessAsync("/cancel", 1, bot.Replies);
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(JobStatus.Cancelled, job!.Status);
+        Assert.Contains(bot.Replies.Texts, text => text.Contains("cancelled"));
+        Assert.DoesNotContain(bot.Replies.Pngs, png => png.FileName == "map-routes.png");
+
+        // The chat is free again: the same places can be solved right away.
+        world.TilesBlock = false;
+
+        await bot.EnterAsync();
+        await bot.PressSolveAsync();
+
+        var again = await bot.RunQueuedJobAsync();
+
+        Assert.Equal(JobStatus.Completed, again.Status);
+        Assert.Contains(bot.Replies.Pngs, png => png.FileName == "map-routes.png");
     }
 }

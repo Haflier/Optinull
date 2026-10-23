@@ -486,7 +486,6 @@ The screenshots below show Optinull's Telegram interface, optimization results, 
 
 The README tracks these project-level next steps:
 
-- [ ] Integration-test coverage improvements
 - [ ] CI pipeline and container image
 - [ ] Persistent job and conversation storage
 - [ ] Additional problem types, such as bin packing
@@ -502,3 +501,4 @@ Already implemented:
 - [x] Progress tracking, cancellation, time limits, and per-chat job limits
 - [x] Solver tuning through chat parameters
 - [x] Automatic per-problem and per-budget solver settings, with user overrides
+- [x] Integration-test coverage improvements
