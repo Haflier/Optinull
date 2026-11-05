@@ -2,8 +2,6 @@
 
 Optinull is a .NET 8 optimization engine controlled through a Telegram bot. This guide covers setup, commands, supported problem formats, solver tuning, architecture, testing, and extending the project.
 
-[← Back to the project overview](../README.md)
-
 ## Contents
 
 - [How it works](#how-it-works)
